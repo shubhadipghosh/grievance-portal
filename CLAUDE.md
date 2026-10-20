@@ -102,6 +102,9 @@ append-only, enforced by a database trigger. Never bypass it.
 2. Entities, repositories, seed data
 3. Status state machine + grievance service
 4. Security: OTP login (citizens), password login (staff), scoped permissions
+   - `AppUser.setStatus()` is public but now gates all authorization
+     (suspension). Replace it with an audited suspend/reinstate operation
+     behind its own permission.
 5. REST API: controllers, DTOs, pagination, OpenAPI
 6. Attachments → object storage
 7. SLA scheduler + escalation

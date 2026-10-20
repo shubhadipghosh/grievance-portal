@@ -1,5 +1,9 @@
-package com.shubha.grievanceportal.grievance;
+package com.shubha.grievanceportal.grievance.internal;
 
+import com.shubha.grievanceportal.grievance.GrievanceStatus;
+import com.shubha.grievanceportal.grievance.HoldOwnerType;
+import com.shubha.grievanceportal.grievance.HoldReasonType;
+import com.shubha.grievanceportal.grievance.Priority;
 import com.shubha.grievanceportal.identity.AppUser;
 import com.shubha.grievanceportal.organization.Category;
 import com.shubha.grievanceportal.organization.Department;
@@ -30,7 +34,7 @@ import java.util.UUID;
  * <p>Fields driven by the status machine (status, assignee, SLA clock,
  * reopen count, hold tracking, nudge scheduling, resolved/closed timestamps)
  * have no setters. They change
- * only through the transition logic, which is not part of this class yet.
+ * only through the package-private {@link #applyTransition}.
  */
 @Entity
 @Table(name = "grievance")
@@ -186,6 +190,70 @@ public class Grievance {
         updatedAt = OffsetDateTime.now();
     }
 
+    /**
+     * Sets the status and its side effects (STATE_MACHINE.md, "Side effects by
+     * target state") together. Legality, authorization and reason checks are the
+     * caller's job: only the transition service calls this.
+     */
+    void applyTransition(GrievanceStatus target, OffsetDateTime now) {
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(now, "now");
+        if (status == GrievanceStatus.ON_HOLD) {
+            // hold_fields_consistent requires these null outside ON_HOLD.
+            holdReasonType = null;
+            holdOwnerType = null;
+            holdOwner = null;
+            holdOwnerNote = null;
+            holdSince = null;
+            nextReviewAt = null;
+            // TODO(SLA): if the hold paused the clock, add the paused duration to
+            //  totalPausedSeconds and extend slaDueAt by it. Not reachable until
+            //  the ON_HOLD method exists.
+        }
+        switch (target) {
+            case RESOLVED -> {
+                resolvedAt = now;
+                slaPausedAt = now;
+                startNudgeCycle(now);
+            }
+            case REJECTED -> {
+                slaPausedAt = now;
+                startNudgeCycle(now);
+            }
+            case CLOSED -> {
+                closedAt = now;
+                nextNudgeAt = null;
+            }
+            case REOPENED -> {
+                reopenCount = 1;
+                resolvedAt = null;
+                slaPausedAt = null;
+                nextNudgeAt = null;
+                // TODO(SLA): recompute slaDueAt for the reopened cycle.
+            }
+            case IN_PROGRESS -> {
+                if (status == GrievanceStatus.RESOLVED) {
+                    // Staff revert (transition 14): undo the resolution.
+                    resolvedAt = null;
+                    slaPausedAt = null;
+                    nudgeCount = 0;
+                    nextNudgeAt = null;
+                    // TODO(SLA): extend slaDueAt by the time spent RESOLVED.
+                }
+            }
+            case ACKNOWLEDGED -> {
+            }
+            case ON_HOLD, ASSIGNED, SUBMITTED ->
+                    throw new IllegalArgumentException("applyTransition does not handle " + target);
+        }
+        status = target;
+    }
+
+    private void startNudgeCycle(OffsetDateTime now) {
+        nudgeCount = 0;
+        nextNudgeAt = now.plusDays(5);
+    }
+
     public UUID getId() {
         return id;
     }
@@ -202,7 +270,8 @@ public class Grievance {
         return category;
     }
 
-    public void setCategory(Category category) {
+    // Not public: category drives the SLA. Changed only by triage (not yet built).
+    void setCategory(Category category) {
         this.category = Objects.requireNonNull(category, "category");
     }
 
@@ -214,7 +283,10 @@ public class Grievance {
         return department;
     }
 
-    public void setDepartment(Department department) {
+    // Not public: department is half the authorization scope. Changed only by
+    // triage (not yet built), which must check GRIEVANCE_TRIAGE on the original
+    // department first.
+    void setDepartment(Department department) {
         this.department = Objects.requireNonNull(department, "department");
     }
 

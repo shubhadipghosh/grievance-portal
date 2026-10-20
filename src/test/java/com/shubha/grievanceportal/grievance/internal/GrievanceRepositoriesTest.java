@@ -1,7 +1,6 @@
 package com.shubha.grievanceportal.grievance.internal;
 
 import com.shubha.grievanceportal.TestcontainersConfiguration;
-import com.shubha.grievanceportal.grievance.Grievance;
 import com.shubha.grievanceportal.grievance.GrievanceStatus;
 import com.shubha.grievanceportal.grievance.Priority;
 import com.shubha.grievanceportal.identity.AppUser;
@@ -196,6 +195,17 @@ class GrievanceRepositoriesTest {
                 .setParameter(1, entry.getId())
                 .executeUpdate())
                 .hasStackTraceContaining("append-only");
+    }
+
+    @Test
+    void grievanceExposesNoPublicSetterOnScopeOrStateFields() {
+        // Department and ward are the authorization scope, category drives the SLA,
+        // and status fields belong to applyTransition. Only priority is free to set.
+        assertThat(Arrays.stream(Grievance.class.getDeclaredMethods())
+                .filter(m -> Modifier.isPublic(m.getModifiers()))
+                .map(Method::getName)
+                .filter(name -> name.startsWith("set") || name.equals("applyTransition")))
+                .containsExactly("setPriority");
     }
 
     @Test

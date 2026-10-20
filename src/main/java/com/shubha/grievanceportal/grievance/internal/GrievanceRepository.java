@@ -1,6 +1,5 @@
 package com.shubha.grievanceportal.grievance.internal;
 
-import com.shubha.grievanceportal.grievance.Grievance;
 import com.shubha.grievanceportal.grievance.GrievanceStatus;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;

@@ -1,6 +1,5 @@
 package com.shubha.grievanceportal.grievance.internal;
 
-import com.shubha.grievanceportal.grievance.Grievance;
 import com.shubha.grievanceportal.identity.AppUser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

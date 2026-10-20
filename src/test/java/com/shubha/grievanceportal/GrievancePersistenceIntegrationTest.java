@@ -1,6 +1,6 @@
 package com.shubha.grievanceportal;
 
-import com.shubha.grievanceportal.grievance.Grievance;
+import com.shubha.grievanceportal.grievance.internal.Grievance;
 import com.shubha.grievanceportal.grievance.GrievanceStatus;
 import com.shubha.grievanceportal.grievance.internal.GrievanceRepository;
 import com.shubha.grievanceportal.identity.AppUser;

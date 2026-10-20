@@ -173,6 +173,29 @@ Order of operations, all inside one transaction:
 8. Save
 9. Publish domain event for notifications (outside the transaction)
 
+### Errors: precise in the service, gated at the API
+
+The service throws a distinct exception per failure (not found, illegal
+transition, not authorized, reason required, reopen limit). Callers inside
+the system (the scheduler, batch operations, tests) need to tell these
+apart, so the service never blurs them.
+
+That precision would leak to outsiders: step 2 runs before step 3, so an
+"illegal transition" error reveals a grievance's current status to an actor
+with no rights on it, and "not found" vs anything else reveals whether an
+id exists. The defence belongs at the API layer, not in the service:
+
+1. **Visibility gate first.** Before calling the service, check `canView`:
+   a citizen sees their own grievances; staff see grievances within their
+   granted scope. Not visible → **404**, identical to a nonexistent id.
+2. **Past the gate**, map precisely: `IllegalTransitionException` → **409**,
+   `NotAuthorizedException` → **403**. Both are safe because the actor has
+   already shown they can see the grievance. Remaining mappings are set in
+   the REST API step.
+
+`canView` is not transition-specific: every read endpoint uses the same
+gate.
+
 ### Side effects by target state
 
 | Target | Sets |
@@ -182,7 +205,61 @@ Order of operations, all inside one transaction:
 | CLOSED | closed_at, next_nudge_at=NULL |
 | ON_HOLD | hold_since, hold_reason_type, hold_owner, next_review_at=+7d; sla_paused_at if AWAITING_CITIZEN |
 | IN_PROGRESS (from ON_HOLD) | clears hold_*, adds paused duration to total_paused_seconds, extends sla_due_at by the same |
-| REOPENED | reopen_count=1, resolved_at=NULL, clears sla_paused_at, recomputes sla_due_at |
+| IN_PROGRESS (from RESOLVED, revert) | resolved_at=NULL, clears sla_paused_at, nudge_count=0, next_nudge_at=NULL, extends sla_due_at by time spent RESOLVED |
+| REOPENED | reopen_count=1, resolved_at=NULL, clears sla_paused_at, next_nudge_at=NULL, recomputes sla_due_at |
+
+Any exit from ON_HOLD clears hold_* (the `hold_fields_consistent` CHECK
+requires it), not only the move back to IN_PROGRESS.
+
+State that has no meaning in the target status is set to NULL rather than
+left stale, even where no index or query would currently read it.
+
+### Why three methods, not one
+
+`transition(grievanceId, target, actorId, reason)` handles every target
+whose side effects can be derived from the grievance, the clock and the
+reason alone. Two targets need input that signature cannot carry:
+
+- **ASSIGNED** (transitions 3, 17) sets `current_assignee_id` and writes a
+  `grievance_assignment` row. It needs an assignee.
+- **ON_HOLD** (transition 7) sets `hold_reason_type`, `hold_owner_type`,
+  `hold_owner_id` / `hold_owner_note`. It needs the hold details.
+
+Each gets its own method that runs the same steps 1–9 with its extra
+input. The generic method rejects these two targets with
+`IllegalArgumentException` before loading the grievance, so the rejection
+depends only on the argument and reveals nothing about the grievance or
+the actor's rights.
+
+## Triage (re-routing)
+
+Triage changes a grievance's category and/or department. It is a separate
+operation, not part of SUBMITTED → ACKNOWLEDGED: a grievance can turn out
+to be misrouted days into a department's queue, and must be fixable after
+acknowledgement. It does not change status.
+
+- **Permission in both departments.** The actor needs GRIEVANCE_TRIAGE
+  scoped to the **original** department and to the **destination**
+  department. Otherwise one department can unilaterally dump work on
+  another.
+  - Later refinement: an actor without TRIAGE in the destination raises a
+    *transfer request* that the destination accepts or declines, instead of
+    a direct move.
+- **Category change recomputes `sla_due_at` from the original submission
+  time**, never from now. Recomputing from now would reset the clock, and
+  a breaching grievance would become compliant by reclassification.
+- **Ward is immutable.** A citizen reporting a location is reporting a
+  fact. A wrong ward is a data error, fixed by an admin correction with its
+  own audit, not by triage.
+- **Every reroute writes a `grievance_reroute` row** (V6, append-only, with
+  a non-blank reason).
+- **The reroute row must agree with the grievance. The service guarantees
+  this, not the database.** The database cannot check that `old_*` equals
+  the grievance's category/department/ward before the change and `new_*`
+  equals them after it. A trigger would fire inside the same transaction as
+  the update, and the ordering is fragile. Triage tests must therefore read
+  both the grievance and its reroute row back after a database round-trip
+  and compare category, department and ward.
 
 ## Authorization scoping
 
@@ -221,3 +298,10 @@ package-private `applyTransition(GrievanceStatus, OffsetDateTime)` that
 updates status and the matching timestamps together. This makes it
 structurally impossible to change status without going through the
 service.
+
+The same applies to every field that takes part in authorization or the
+state machine. `department` and `ward` are the authorization scope and
+`category` drives the SLA, so none of them has a public setter. Department
+and category change only through triage (see above). Ward never changes
+through routine operations. Of the mutable fields, only `priority` has a
+public setter, and a reflection test fails the build if another appears.
