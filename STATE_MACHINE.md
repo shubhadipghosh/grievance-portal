@@ -217,6 +217,10 @@ All mappings live in `shared.ApiExceptionHandler`, as RFC 9457 ProblemDetail:
 | `IneligibleAssigneeException` | 422 |
 | `InvalidHoldDetailsException` | 422 |
 | `InvalidReferenceException` (unknown/inactive category or ward) | 422 |
+| `InvalidPhoneException` (OTP send) | 400 |
+| `RateLimitedException` (OTP send, staff login), with `Retry-After` | 429 |
+| `AuthenticationException`: no session, or failed login (fixed detail) | 401 |
+| `AccessDeniedException`, including a missing/invalid CSRF token (fixed detail) | 403 |
 | anything else | 500, generic detail, logged; no message or stack trace |
 
 `canView` is not transition-specific: every read endpoint uses the same

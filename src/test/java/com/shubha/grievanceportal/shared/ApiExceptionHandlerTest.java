@@ -6,7 +6,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Duration;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
@@ -22,6 +27,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,6 +52,11 @@ class ApiExceptionHandlerTest {
                 case "invalidHold" -> new InvalidHoldDetailsException("note");
                 case "invalidReference" -> new InvalidReferenceException("category", UUID.randomUUID());
                 case "optimisticLock" -> new OptimisticLockingFailureException("version 3 != 4");
+                case "invalidPhone" -> new InvalidPhoneException();
+                case "rateLimited" -> new RateLimitedException(Duration.ofMillis(90_001));
+                case "badCredentials" -> new BadCredentialsException("user admin@x is locked");
+                case "unauthenticated" -> new InsufficientAuthenticationException("Full authentication is required");
+                case "accessDenied" -> new AccessDeniedException("no");
                 case "unexpected" -> new IllegalStateException("db password is hunter2");
                 default -> throw new IllegalArgumentException("unknown type " + type);
             };
@@ -73,6 +84,11 @@ class ApiExceptionHandlerTest {
             "invalidHold,        422",
             "invalidReference,   422",
             "optimisticLock,     409",
+            "invalidPhone,       400",
+            "rateLimited,        429",
+            "badCredentials,     401",
+            "unauthenticated,    401",
+            "accessDenied,       403",
             "unexpected,         500",
     })
     void exceptionMapsToStatusAsProblemDetail(String type, int expectedStatus) throws Exception {
@@ -81,6 +97,19 @@ class ApiExceptionHandlerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(expectedStatus))
                 .andExpect(jsonPath("$.detail").exists());
+    }
+
+    @Test
+    void rateLimitedSaysWhenToRetryInWholeSecondsRoundedUp() throws Exception {
+        mvc.perform(get("/throw/rateLimited"))
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "91"));
+    }
+
+    @Test
+    void securityExceptionMessagesAreNotEchoed() throws Exception {
+        mvc.perform(get("/throw/badCredentials"))
+                .andExpect(content().string(not(containsString("locked"))))
+                .andExpect(content().string(not(containsString("admin@x"))));
     }
 
     @Test

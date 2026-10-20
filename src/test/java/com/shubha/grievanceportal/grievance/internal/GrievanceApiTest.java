@@ -3,6 +3,7 @@ package com.shubha.grievanceportal.grievance.internal;
 import com.jayway.jsonpath.JsonPath;
 import com.shubha.grievanceportal.TestcontainersConfiguration;
 import com.shubha.grievanceportal.identity.AppUser;
+import com.shubha.grievanceportal.identity.CurrentUser;
 import com.shubha.grievanceportal.organization.Category;
 import com.shubha.grievanceportal.organization.Department;
 import com.shubha.grievanceportal.organization.Ward;
@@ -14,14 +15,18 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
+import static com.shubha.grievanceportal.CsrfTokens.csrfToken;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -35,12 +40,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("stub-auth")
 @Transactional
 @Import(TestcontainersConfiguration.class)
 class GrievanceApiTest {
-
-    private static final String ACTOR = GrievanceController.ACTOR_HEADER;
 
     @Autowired
     MockMvc mvc;
@@ -66,6 +68,16 @@ class GrievanceApiTest {
         em.flush();
         grant(admin, "DEPT_ADMIN", null);
         grant(officer, "FIELD_OFFICER", w12);
+    }
+
+    /**
+     * Signed in as the user, with a valid CSRF token. The principal is what a
+     * login stores in the session; real login is covered by AuthApiTest.
+     */
+    static RequestPostProcessor as(AppUser user) {
+        var principal = new CurrentUser(user.getId(), user.getUserType());
+        var signedIn = authentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of()));
+        return request -> csrfToken().postProcessRequest(signedIn.postProcessRequest(request));
     }
 
     <T> T persist(T entity) {
@@ -103,7 +115,7 @@ class GrievanceApiTest {
 
     /** Files a grievance as the citizen and returns its id. */
     String file() throws Exception {
-        String body = mvc.perform(post("/api/v1/grievances").header(ACTOR, citizen.getId())
+        String body = mvc.perform(post("/api/v1/grievances").with(as(citizen))
                         .contentType(MediaType.APPLICATION_JSON).content(newGrievanceJson("Garbage not collected")))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
@@ -111,7 +123,7 @@ class GrievanceApiTest {
     }
 
     ResultActions act(String action, String grievanceId, AppUser actor, String json) throws Exception {
-        var request = post("/api/v1/grievances/{id}/" + action, grievanceId).header(ACTOR, actor.getId());
+        var request = post("/api/v1/grievances/{id}/" + action, grievanceId).with(as(actor));
         if (json != null) {
             request.contentType(MediaType.APPLICATION_JSON).content(json);
         }
@@ -128,7 +140,7 @@ class GrievanceApiTest {
 
     @Test
     void fileCreatesASubmittedGrievanceWithTicketNumberAndLocation() throws Exception {
-        mvc.perform(post("/api/v1/grievances").header(ACTOR, citizen.getId())
+        mvc.perform(post("/api/v1/grievances").with(as(citizen))
                         .contentType(MediaType.APPLICATION_JSON).content(newGrievanceJson("Garbage not collected")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.ticketNo").value(matchesPattern("GRV-\\d{4}-\\d{6}")))
@@ -141,13 +153,13 @@ class GrievanceApiTest {
 
     @Test
     void getByTicketNumber() throws Exception {
-        String created = mvc.perform(post("/api/v1/grievances").header(ACTOR, citizen.getId())
+        String created = mvc.perform(post("/api/v1/grievances").with(as(citizen))
                         .contentType(MediaType.APPLICATION_JSON).content(newGrievanceJson("Garbage not collected")))
                 .andReturn().getResponse().getContentAsString();
         String id = JsonPath.read(created, "$.id");
         String ticketNo = JsonPath.read(created, "$.ticketNo");
 
-        mvc.perform(get("/api/v1/grievances").param("ticketNo", ticketNo).header(ACTOR, admin.getId()))
+        mvc.perform(get("/api/v1/grievances").param("ticketNo", ticketNo).with(as(admin)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.ticketNo").value(ticketNo));
@@ -157,7 +169,7 @@ class GrievanceApiTest {
     void getById() throws Exception {
         String id = file();
 
-        mvc.perform(get("/api/v1/grievances/{id}", id).header(ACTOR, admin.getId()))
+        mvc.perform(get("/api/v1/grievances/{id}", id).with(as(admin)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id));
     }
@@ -169,7 +181,7 @@ class GrievanceApiTest {
         String acknowledged = file();
         act("acknowledge", acknowledged, admin, null).andExpect(status().isOk());
 
-        mvc.perform(get("/api/v1/grievances").header(ACTOR, admin.getId())
+        mvc.perform(get("/api/v1/grievances").with(as(admin))
                         .param("departmentId", sanitation.getId().toString())
                         .param("status", "SUBMITTED")
                         .param("size", "1"))
@@ -240,44 +252,44 @@ class GrievanceApiTest {
     @Test
     void unknownTicketIs404() throws Exception {
         expectProblem(mvc.perform(get("/api/v1/grievances").param("ticketNo", "GRV-1999-000000")
-                .header(ACTOR, admin.getId())), 404);
+                .with(as(admin))), 404);
     }
 
     @Test
     void unknownIdIs404() throws Exception {
-        expectProblem(mvc.perform(get("/api/v1/grievances/{id}", UUID.randomUUID()).header(ACTOR, admin.getId())), 404);
+        expectProblem(mvc.perform(get("/api/v1/grievances/{id}", UUID.randomUUID()).with(as(admin))), 404);
     }
 
     @Test
     void descriptionOver5000CharsIs400() throws Exception {
         String body = newGrievanceJson("Garbage not collected")
                 .replace("Three days now.", "x".repeat(5001));
-        expectProblem(mvc.perform(post("/api/v1/grievances").header(ACTOR, citizen.getId())
+        expectProblem(mvc.perform(post("/api/v1/grievances").with(as(citizen))
                 .contentType(MediaType.APPLICATION_JSON).content(body)), 400);
     }
 
     @Test
     void invalidBodyIs400() throws Exception {
-        expectProblem(mvc.perform(post("/api/v1/grievances").header(ACTOR, citizen.getId())
+        expectProblem(mvc.perform(post("/api/v1/grievances").with(as(citizen))
                 .contentType(MediaType.APPLICATION_JSON).content(newGrievanceJson(""))), 400);
     }
 
     @Test
-    void missingActorHeaderIs400() throws Exception {
-        expectProblem(mvc.perform(post("/api/v1/grievances")
-                .contentType(MediaType.APPLICATION_JSON).content(newGrievanceJson("x"))), 400);
+    void unauthenticatedIs401() throws Exception {
+        expectProblem(mvc.perform(post("/api/v1/grievances").with(csrfToken())
+                .contentType(MediaType.APPLICATION_JSON).content(newGrievanceJson("x"))), 401);
     }
 
     @Test
     void staffCannotFileAndGets403() throws Exception {
-        expectProblem(mvc.perform(post("/api/v1/grievances").header(ACTOR, admin.getId())
+        expectProblem(mvc.perform(post("/api/v1/grievances").with(as(admin))
                 .contentType(MediaType.APPLICATION_JSON).content(newGrievanceJson("x"))), 403);
     }
 
     @Test
     void unknownCategoryIs422() throws Exception {
         String json = newGrievanceJson("x").replace(garbage.getId().toString(), UUID.randomUUID().toString());
-        expectProblem(mvc.perform(post("/api/v1/grievances").header(ACTOR, citizen.getId())
+        expectProblem(mvc.perform(post("/api/v1/grievances").with(as(citizen))
                 .contentType(MediaType.APPLICATION_JSON).content(json)), 422);
     }
 

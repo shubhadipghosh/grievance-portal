@@ -10,17 +10,18 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 
 /**
- * Send counters in otp_rate_limit over fixed windows aligned to the epoch
+ * Counters in rate_limit over fixed windows aligned to the epoch
  * (the daily window starts at 00:00 UTC). Runs in the caller's transaction.
+ * PHONE and IP count OTP sends; STAFF_LOGIN counts failed staff logins per email.
  */
 @Component
-class OtpRateLimiter {
+class RateLimiter {
 
-    enum Scope { PHONE, IP }
+    enum Scope { PHONE, IP, STAFF_LOGIN }
 
     private final JdbcClient jdbc;
 
-    OtpRateLimiter(JdbcClient jdbc) {
+    RateLimiter(JdbcClient jdbc) {
         this.jdbc = jdbc;
     }
 
@@ -37,14 +38,14 @@ class OtpRateLimiter {
         OffsetDateTime windowStart = windowStart(now, window);
         OffsetDateTime at = now.atOffset(ZoneOffset.UTC);
         boolean acquired = jdbc.sql("""
-                        INSERT INTO otp_rate_limit (scope_type, scope_key, window_start, send_count, blocked_until)
+                        INSERT INTO rate_limit (scope_type, scope_key, window_start, attempt_count, blocked_until)
                         VALUES (:scope, :key, :windowStart, 1, CAST(:blockedUntil AS timestamptz))
                         ON CONFLICT (scope_type, scope_key, window_start) DO UPDATE
-                            SET send_count = otp_rate_limit.send_count + 1,
+                            SET attempt_count = rate_limit.attempt_count + 1,
                                 blocked_until = EXCLUDED.blocked_until
-                            WHERE otp_rate_limit.send_count < :cap
-                              AND (otp_rate_limit.blocked_until IS NULL OR otp_rate_limit.blocked_until <= :now)
-                        RETURNING send_count
+                            WHERE rate_limit.attempt_count < :cap
+                              AND (rate_limit.blocked_until IS NULL OR rate_limit.blocked_until <= :now)
+                        RETURNING attempt_count
                         """)
                 .param("scope", scope.name())
                 .param("key", key)
@@ -61,7 +62,7 @@ class OtpRateLimiter {
 
         // Blocked, so the row exists (and the upsert holds its lock).
         return Optional.of(jdbc.sql("""
-                        SELECT send_count, blocked_until FROM otp_rate_limit
+                        SELECT attempt_count, blocked_until FROM rate_limit
                         WHERE scope_type = :scope AND scope_key = :key AND window_start = :windowStart
                         """)
                 .param("scope", scope.name())
@@ -69,7 +70,7 @@ class OtpRateLimiter {
                 .param("windowStart", windowStart)
                 .query((rs, n) -> {
                     Duration retry = Duration.ZERO;
-                    if (rs.getInt("send_count") >= cap) {
+                    if (rs.getInt("attempt_count") >= cap) {
                         retry = Duration.between(at, windowStart.plus(window));
                     }
                     OffsetDateTime blockedUntil = rs.getObject("blocked_until", OffsetDateTime.class);

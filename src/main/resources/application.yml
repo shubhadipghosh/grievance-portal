@@ -47,6 +47,9 @@ app:
   # Zone used for citizen-facing display formatting (ticket number
   # year). Everything else runs in UTC.
   display-zone: Asia/Kolkata
+  # Secure flag on the SESSION and XSRF-TOKEN cookies. Set COOKIE_SECURE=false
+  # only for local development over plain HTTP.
+  secure-cookies: ${COOKIE_SECURE:true}
 
 grievance:
   sla:

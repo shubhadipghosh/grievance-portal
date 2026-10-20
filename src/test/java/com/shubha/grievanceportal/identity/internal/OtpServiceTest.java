@@ -123,7 +123,7 @@ class OtpServiceTest {
 
     @BeforeEach
     void reset() {
-        jdbc.sql("DELETE FROM otp_rate_limit").update();
+        jdbc.sql("DELETE FROM rate_limit").update();
         jdbc.sql("DELETE FROM otp_challenge").update();
         jdbc.sql("DELETE FROM app_user WHERE phone LIKE '+9198765%'").update();
         clock.set(START);

@@ -11,6 +11,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.OffsetDateTime;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -79,7 +80,7 @@ public class AppUser {
 
     public static AppUser staff(String fullName, String email, String passwordHash) {
         AppUser user = new AppUser(UserType.STAFF, Objects.requireNonNull(fullName, "fullName"));
-        user.email = email;
+        user.email = normalizeEmail(email);
         user.passwordHash = Objects.requireNonNull(passwordHash, "passwordHash");
         return user;
     }
@@ -113,7 +114,15 @@ public class AppUser {
     }
 
     public void setEmail(String email) {
-        this.email = email;
+        this.email = normalizeEmail(email);
+    }
+
+    /**
+     * Emails are case-insensitive: stored lowercased, and looked up the same way
+     * (V8's email_lowercase CHECK rejects anything else).
+     */
+    public static String normalizeEmail(String email) {
+        return email == null ? null : email.toLowerCase(Locale.ROOT);
     }
 
     public String getPasswordHash() {

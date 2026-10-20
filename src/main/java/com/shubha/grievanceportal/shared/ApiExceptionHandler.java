@@ -3,8 +3,13 @@ package com.shubha.grievanceportal.shared;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
@@ -52,6 +57,41 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             InvalidReferenceException.class})
     ProblemDetail unprocessable(RuntimeException e) {
         return problem(HttpStatus.UNPROCESSABLE_CONTENT, e);
+    }
+
+    @ExceptionHandler(InvalidPhoneException.class)
+    ProblemDetail invalidPhone(InvalidPhoneException e) {
+        return problem(HttpStatus.BAD_REQUEST, e);
+    }
+
+    @ExceptionHandler(RateLimitedException.class)
+    ResponseEntity<ProblemDetail> rateLimited(RateLimitedException e) {
+        // Whole seconds, rounded up, so a client that waits exactly this long is let through.
+        long seconds = Math.max(1, (e.getRetryAfter().toMillis() + 999) / 1000);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(seconds))
+                .body(problem(HttpStatus.TOO_MANY_REQUESTS, e));
+    }
+
+    // Security exceptions get fixed details: Spring Security's messages are not
+    // written for end users, and some (UsernameNotFoundException) would reveal
+    // whether an account exists. SecurityConfig routes the filter chain's own
+    // 401s and 403s here too.
+
+    @ExceptionHandler(BadCredentialsException.class)
+    ProblemDetail badCredentials() {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "The sign-in details are incorrect.");
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    ProblemDetail unauthenticated() {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Sign in to continue.");
+    }
+
+    // Includes a missing or invalid CSRF token.
+    @ExceptionHandler(AccessDeniedException.class)
+    ProblemDetail accessDenied() {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "Access denied.");
     }
 
     // @Version caught a concurrent change; the client should reload and retry.

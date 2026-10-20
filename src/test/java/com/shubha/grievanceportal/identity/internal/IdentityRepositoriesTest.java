@@ -67,6 +67,25 @@ class IdentityRepositoriesTest {
     }
 
     @Test
+    void emailIsStoredLowercased() {
+        AppUser staff = users.saveAndFlush(AppUser.staff("Ravi Sen", "Ravi@City.gov.in", "{bcrypt}x"));
+        em.clear();
+
+        assertThat(users.findById(staff.getId()).orElseThrow().getEmail()).isEqualTo("ravi@city.gov.in");
+    }
+
+    @Test
+    void mixedCaseEmailWrittenPastTheApplicationIsRejected() {
+        // Raw SQL, past AppUser's normalization: login could never match this row.
+        assertThatThrownBy(() -> em.getEntityManager().createNativeQuery("""
+                        insert into app_user (user_type, email, password_hash, full_name)
+                        values ('STAFF', 'Ravi@City.gov.in', '{bcrypt}x', 'Ravi Sen')""")
+                .executeUpdate())
+                .rootCause()
+                .hasMessageContaining("email_lowercase");
+    }
+
+    @Test
     void updateBumpsUpdatedAt() {
         AppUser user = users.saveAndFlush(AppUser.citizen("+919800000002", "Old Name"));
         em.clear();

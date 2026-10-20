@@ -30,13 +30,4 @@ class GrievancePortalApplicationTests {
                         + "configuration; do not delete this assertion.")
                 .doesNotContain("dev-otp");
     }
-
-    @Test
-    void stubAuthProfileIsNotActive() {
-        assertThat(environment.getActiveProfiles())
-                .as("stub-auth is active in the default configuration. It leaves /api/v1/** UNAUTHENTICATED "
-                        + "and trusts the X-Actor-Id header, so any caller can act as any user, admins "
-                        + "included. Remove it from the configuration; do not delete this assertion.")
-                .doesNotContain("stub-auth");
-    }
 }

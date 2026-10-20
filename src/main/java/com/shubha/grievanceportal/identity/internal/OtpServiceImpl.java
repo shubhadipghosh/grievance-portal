@@ -31,7 +31,7 @@ class OtpServiceImpl implements OtpService {
 
     private final OtpChallengeRepository challenges;
     private final AppUserRepository users;
-    private final OtpRateLimiter rateLimiter;
+    private final RateLimiter rateLimiter;
     private final OtpSender sender;
     private final PasswordEncoder encoder;
     private final OtpProperties props;
@@ -41,7 +41,7 @@ class OtpServiceImpl implements OtpService {
     // Hash checked when there is no live code, so that path costs the same as a wrong code.
     private final String dummyHash;
 
-    OtpServiceImpl(OtpChallengeRepository challenges, AppUserRepository users, OtpRateLimiter rateLimiter,
+    OtpServiceImpl(OtpChallengeRepository challenges, AppUserRepository users, RateLimiter rateLimiter,
                    OtpSender sender, PasswordEncoder encoder, OtpProperties props, Clock clock,
                    PlatformTransactionManager transactionManager) {
         this.challenges = challenges;
@@ -66,9 +66,9 @@ class OtpServiceImpl implements OtpService {
         String code = newCode();
 
         OtpSendResult result = tx.execute(status -> {
-            Optional<Duration> blocked = rateLimiter.tryAcquire(OtpRateLimiter.Scope.PHONE, phone,
+            Optional<Duration> blocked = rateLimiter.tryAcquire(RateLimiter.Scope.PHONE, phone,
                             Duration.ofDays(1), props.maxSendsPerPhonePerDay(), props.resendCooldown(), now)
-                    .or(() -> rateLimiter.tryAcquire(OtpRateLimiter.Scope.IP, ip.getHostAddress(),
+                    .or(() -> rateLimiter.tryAcquire(RateLimiter.Scope.IP, ip.getHostAddress(),
                             Duration.ofHours(1), props.maxSendsPerIpPerHour(), Duration.ZERO, now));
             if (blocked.isPresent()) {
                 // Undo a phone count already taken when the IP cap is what blocked.
