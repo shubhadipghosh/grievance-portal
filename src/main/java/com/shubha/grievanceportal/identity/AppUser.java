@@ -40,7 +40,8 @@ public class AppUser {
     @Column(name = "password_hash")
     private String passwordHash;
 
-    @Column(name = "full_name", nullable = false, length = 150)
+    // Nullable for citizens only (staff_needs_name): auto-registration has no name yet.
+    @Column(name = "full_name", length = 150)
     private String fullName;
 
     @Column(name = "preferred_locale", nullable = false, length = 10)
@@ -63,10 +64,13 @@ public class AppUser {
 
     private AppUser(UserType userType, String fullName) {
         this.userType = userType;
-        this.fullName = Objects.requireNonNull(fullName, "fullName");
+        this.fullName = fullName;
     }
 
-    /** @param phone E.164 format */
+    /**
+     * @param phone    E.164 format
+     * @param fullName nullable: a citizen auto-registered by OTP has not given a name
+     */
     public static AppUser citizen(String phone, String fullName) {
         AppUser user = new AppUser(UserType.CITIZEN, fullName);
         user.phone = Objects.requireNonNull(phone, "phone");
@@ -74,7 +78,7 @@ public class AppUser {
     }
 
     public static AppUser staff(String fullName, String email, String passwordHash) {
-        AppUser user = new AppUser(UserType.STAFF, fullName);
+        AppUser user = new AppUser(UserType.STAFF, Objects.requireNonNull(fullName, "fullName"));
         user.email = email;
         user.passwordHash = Objects.requireNonNull(passwordHash, "passwordHash");
         return user;

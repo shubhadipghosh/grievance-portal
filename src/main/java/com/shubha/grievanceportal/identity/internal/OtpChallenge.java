@@ -8,7 +8,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import java.net.InetAddress;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -49,6 +52,14 @@ public class OtpChallenge {
     @Column(name = "burned_reason", length = 30)
     private BurnReason burnedReason;
 
+    // Personal data under DPDP: kept only to enforce the per-IP send cap.
+    @JdbcTypeCode(SqlTypes.INET)
+    @Column(name = "request_ip", updatable = false)
+    private InetAddress requestIp;
+
+    @Column(name = "user_agent", length = 255, updatable = false)
+    private String userAgent;
+
     // DB default now(); null on a freshly persisted instance until reloaded.
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -57,10 +68,21 @@ public class OtpChallenge {
     }
 
     public OtpChallenge(String phone, String codeHash, OtpPurpose purpose, OffsetDateTime expiresAt) {
+        this(phone, codeHash, purpose, expiresAt, null, null);
+    }
+
+    /**
+     * @param requestIp nullable
+     * @param userAgent nullable, at most 255 characters
+     */
+    public OtpChallenge(String phone, String codeHash, OtpPurpose purpose, OffsetDateTime expiresAt,
+                        InetAddress requestIp, String userAgent) {
         this.phone = Objects.requireNonNull(phone, "phone");
         this.codeHash = Objects.requireNonNull(codeHash, "codeHash");
         this.purpose = Objects.requireNonNull(purpose, "purpose");
         this.expiresAt = Objects.requireNonNull(expiresAt, "expiresAt");
+        this.requestIp = requestIp;
+        this.userAgent = userAgent;
     }
 
     public UUID getId() {
@@ -128,6 +150,14 @@ public class OtpChallenge {
         }
         this.consumedAt = Objects.requireNonNull(at, "at");
         this.burnedReason = reason;
+    }
+
+    public InetAddress getRequestIp() {
+        return requestIp;
+    }
+
+    public String getUserAgent() {
+        return userAgent;
     }
 
     public OffsetDateTime getCreatedAt() {

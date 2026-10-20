@@ -54,3 +54,16 @@ grievance:
     # reopened. Must be 0 < factor <= 1.0 — a reopen means the first
     # resolution failed, so the window is shorter, never longer.
     reopen-factor: 0.5
+
+otp:
+  # Digits in a login code.
+  code-length: 6
+  # How long a code stays valid after it is sent.
+  validity: 15m
+  # Wrong codes allowed before the code is burned (DB caps this at 3).
+  max-attempts: 3
+  # Minimum gap between sends to one phone.
+  resend-cooldown: 60s
+  # Send caps, over fixed windows starting on the UTC day / hour.
+  max-sends-per-phone-per-day: 5
+  max-sends-per-ip-per-hour: 20
