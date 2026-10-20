@@ -82,17 +82,20 @@ class IdentityRepositoriesTest {
 
     @Test
     void rolePermissionsUseCompositeKey() {
-        Role role = roles.save(new Role("DEPT_ADMIN", "Department administrator"));
-        Permission assign = permissions.save(new Permission("GRIEVANCE_ASSIGN", null));
-        Permission hold = permissions.save(new Permission("GRIEVANCE_HOLD", null));
-        rolePermissions.save(new RolePermission(role, assign));
-        rolePermissions.save(new RolePermission(role, hold));
+        // DEPT_ADMIN and its grievance permissions are seeded by V4; USER_MANAGE is not granted to it.
+        Role role = roles.findByCode("DEPT_ADMIN").orElseThrow();
+        Permission userManage = permissions.findById("USER_MANAGE").orElseThrow();
+        rolePermissions.save(new RolePermission(role, userManage));
         em.flush();
         em.clear();
 
         assertThat(rolePermissions.findByIdRoleId(role.getId()))
                 .extracting(rp -> rp.getId().getPermissionCode())
-                .containsExactlyInAnyOrder("GRIEVANCE_ASSIGN", "GRIEVANCE_HOLD");
+                .containsExactlyInAnyOrder(
+                        "GRIEVANCE_TRIAGE", "GRIEVANCE_ASSIGN", "GRIEVANCE_WORK",
+                        "GRIEVANCE_HOLD", "GRIEVANCE_REJECT", "GRIEVANCE_REVERT",
+                        "GRIEVANCE_VIEW_INTERNAL", "GRIEVANCE_COMMENT", "REPORT_VIEW",
+                        "USER_MANAGE");
         assertThat(roles.findByCode("DEPT_ADMIN")).contains(role);
     }
 
@@ -100,8 +103,8 @@ class IdentityRepositoriesTest {
     void grantsAreScopedAndLazy() {
         AppUser admin = users.save(AppUser.staff("Admin", null, "{bcrypt}x"));
         AppUser officer = users.save(AppUser.staff("Officer", null, "{bcrypt}y"));
-        Role superAdmin = roles.save(new Role("SUPER_ADMIN", null));
-        Role fieldOfficer = roles.save(new Role("FIELD_OFFICER", null));
+        Role superAdmin = roles.findByCode("SUPER_ADMIN").orElseThrow();
+        Role fieldOfficer = roles.findByCode("FIELD_OFFICER").orElseThrow();
         Department dept = em.persist(new Department("SANITATION", "Sanitation"));
         Ward ward = em.persist(new Ward("W12", "Ward 12"));
 
@@ -129,7 +132,7 @@ class IdentityRepositoriesTest {
     @Test
     void duplicateActiveUnscopedGrantIsRejected() {
         AppUser admin = users.save(AppUser.staff("Admin", null, "{bcrypt}x"));
-        Role superAdmin = roles.save(new Role("SUPER_ADMIN", null));
+        Role superAdmin = roles.findByCode("SUPER_ADMIN").orElseThrow();
         grants.saveAndFlush(new UserRoleGrant(admin, superAdmin, null, null, null));
 
         // uq_active_grant COALESCEs NULL scopes, so this must collide.

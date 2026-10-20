@@ -76,7 +76,13 @@ class GrievanceRepositoriesTest {
     void setStatus(Grievance g, GrievanceStatus status) {
         em.flush();
         em.getEntityManager()
-                .createNativeQuery("update grievance set status = ?1, current_assignee_id = ?2 where id = ?3")
+                // hold_fields_consistent: hold fields are set only while ON_HOLD.
+                .createNativeQuery("""
+                        update grievance set status = ?1, current_assignee_id = ?2,
+                            hold_reason_type = case when ?1 = 'ON_HOLD' then 'OTHER' end,
+                            hold_owner_type  = case when ?1 = 'ON_HOLD' then 'STAFF' end,
+                            hold_since       = case when ?1 = 'ON_HOLD' then now() end
+                        where id = ?3""")
                 .setParameter(1, status.name())
                 .setParameter(2, officer.getId())
                 .setParameter(3, g.getId())

@@ -28,7 +28,8 @@ import java.util.UUID;
  * feedback) point here; there are deliberately no collections on this side.
  *
  * <p>Fields driven by the status machine (status, assignee, SLA clock,
- * reopen count, resolved/closed timestamps) have no setters. They change
+ * reopen count, hold tracking, nudge scheduling, resolved/closed timestamps)
+ * have no setters. They change
  * only through the transition logic, which is not part of this class yet.
  */
 @Entity
@@ -93,8 +94,44 @@ public class Grievance {
     @Column(name = "sla_paused_at")
     private OffsetDateTime slaPausedAt;
 
+    // Accumulated across all holds, for reporting.
+    @Column(name = "total_paused_seconds", nullable = false)
+    private long totalPausedSeconds;
+
     @Column(name = "reopen_count", nullable = false)
     private short reopenCount;
+
+    // Hold fields: set together while ON_HOLD, all null otherwise (hold_fields_consistent).
+    @Enumerated(EnumType.STRING)
+    @Column(name = "hold_reason_type", length = 30)
+    private HoldReasonType holdReasonType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "hold_owner_type", length = 20)
+    private HoldOwnerType holdOwnerType;
+
+    // Set when the hold owner is a user; null for external parties.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hold_owner_id")
+    private AppUser holdOwner;
+
+    // External party name; no FK.
+    @Column(name = "hold_owner_note", length = 255)
+    private String holdOwnerNote;
+
+    @Column(name = "hold_since")
+    private OffsetDateTime holdSince;
+
+    // Next 7-day status update while ON_HOLD.
+    @Column(name = "next_review_at")
+    private OffsetDateTime nextReviewAt;
+
+    // Citizen nudge cycle while RESOLVED or REJECTED.
+    @Column(name = "nudge_count", nullable = false)
+    private short nudgeCount;
+
+    @Column(name = "next_nudge_at")
+    private OffsetDateTime nextNudgeAt;
 
     // DB default now(); null on a freshly persisted instance until reloaded.
     @Column(name = "submitted_at", nullable = false, insertable = false, updatable = false)
@@ -225,8 +262,44 @@ public class Grievance {
         return slaPausedAt;
     }
 
+    public long getTotalPausedSeconds() {
+        return totalPausedSeconds;
+    }
+
     public short getReopenCount() {
         return reopenCount;
+    }
+
+    public HoldReasonType getHoldReasonType() {
+        return holdReasonType;
+    }
+
+    public HoldOwnerType getHoldOwnerType() {
+        return holdOwnerType;
+    }
+
+    public AppUser getHoldOwner() {
+        return holdOwner;
+    }
+
+    public String getHoldOwnerNote() {
+        return holdOwnerNote;
+    }
+
+    public OffsetDateTime getHoldSince() {
+        return holdSince;
+    }
+
+    public OffsetDateTime getNextReviewAt() {
+        return nextReviewAt;
+    }
+
+    public short getNudgeCount() {
+        return nudgeCount;
+    }
+
+    public OffsetDateTime getNextNudgeAt() {
+        return nextNudgeAt;
     }
 
     public OffsetDateTime getSubmittedAt() {
