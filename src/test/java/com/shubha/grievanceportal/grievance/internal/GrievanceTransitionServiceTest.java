@@ -20,6 +20,7 @@ import com.shubha.grievanceportal.shared.ReasonRequiredException;
 import com.shubha.grievanceportal.shared.ReopenLimitReachedException;
 import com.shubha.grievanceportal.shared.SystemActor;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -28,8 +29,10 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import static com.shubha.grievanceportal.grievance.GrievanceStatus.ACKNOWLEDGED;
@@ -52,10 +55,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
-@Import({TestcontainersConfiguration.class, GrievanceTransitionServiceImpl.class, GrievanceAuthorization.class})
+@Import({TestcontainersConfiguration.class, GrievanceTransitionServiceImpl.class, GrievanceAuthorization.class,
+        GrievanceTransitionServiceTest.AuthorizationQueryConfig.class})
 class GrievanceTransitionServiceTest {
 
     // Registers identity's AuthorizationQuery implementation via its public interface.
+    // Listed in @Import too, so @Nested classes (which inherit @Import) get it.
     @TestConfiguration
     @ComponentScan(basePackageClasses = AuthorizationQuery.class, useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
@@ -141,6 +146,20 @@ class GrievanceTransitionServiceTest {
         service.assign(grievance.getId(), assignee.getId(), actor.getId(), null);
         em.flush();
         em.clear();
+    }
+
+    // Reopens a resolved grievance and asserts sla_due_at = reopened_at + expected window.
+    // reopened_at is the service's own now(), so it is bracketed by the call.
+    void assertReopenWindow(long expectedWindowSeconds) {
+        forceInProgress();
+        transition(RESOLVED, officer, "bins cleared");
+
+        OffsetDateTime before = OffsetDateTime.now().truncatedTo(ChronoUnit.MICROS);
+        transition(REOPENED, citizen, "still there");
+        OffsetDateTime after = OffsetDateTime.now();
+
+        assertThat(reload().getSlaDueAt()).isBetween(
+                before.plusSeconds(expectedWindowSeconds), after.plusSeconds(expectedWindowSeconds));
     }
 
     void hold(HoldReasonType reasonType, HoldOwnerType ownerType, UUID ownerId, String note) {
@@ -588,5 +607,54 @@ class GrievanceTransitionServiceTest {
         assertThat(g.getTotalPausedSeconds()).isBetween(7200L, 7260L);
         assertThat(g.getSlaDueAt()).isEqualTo(dueBefore.plusSeconds(g.getTotalPausedSeconds()));
         assertThat(g.getSlaPausedAt()).isNotNull();
+    }
+
+    // ---------------------------------------------------------------- clock: revert and reopen
+
+    @Test
+    void revertCreditsTheTimeSpentResolved() {
+        forceInProgress();
+        transition(RESOLVED, officer, "bins cleared");
+        backdatePause(2);
+        OffsetDateTime dueBefore = reload().getSlaDueAt();
+
+        transition(IN_PROGRESS, admin, "marked resolved by mistake");
+
+        Grievance g = reload();
+        assertThat(g.getSlaPausedAt()).isNull();
+        assertThat(g.getTotalPausedSeconds()).isBetween(7200L, 7260L);
+        assertThat(g.getSlaDueAt()).isEqualTo(dueBefore.plusSeconds(g.getTotalPausedSeconds()));
+    }
+
+    @Test
+    void reopenGetsHalfTheCategorySlaByDefault() {
+        // GARBAGE is 48h; default factor 0.5.
+        assertReopenWindow(24 * 3600);
+    }
+
+    @Test
+    void reopenDoesNotAlterTotalPausedSeconds() {
+        forceInProgress();
+        hold(AWAITING_CITIZEN, CITIZEN, null, null);
+        backdatePause(2);
+        transition(IN_PROGRESS, admin, null);
+        long pausedBefore = reload().getTotalPausedSeconds();
+        assertThat(pausedBefore).isPositive();
+        transition(RESOLVED, officer, "bins cleared");
+        backdatePause(1);
+
+        transition(REOPENED, citizen, "still there");
+
+        assertThat(reload().getTotalPausedSeconds()).isEqualTo(pausedBefore);
+    }
+
+    @Nested
+    @TestPropertySource(properties = "grievance.sla.reopen-factor=0.25")
+    class WithNonDefaultReopenFactor {
+
+        @Test
+        void reopenHonoursTheConfiguredFactor() {
+            assertReopenWindow(12 * 3600);
+        }
     }
 }

@@ -217,8 +217,8 @@ gate.
 | CLOSED | closed_at, next_nudge_at=NULL |
 | ON_HOLD | hold_since, hold_reason_type, hold_owner, next_review_at=+7d; sla_paused_at if AWAITING_CITIZEN |
 | IN_PROGRESS (from ON_HOLD) | clears hold_*, adds paused duration to total_paused_seconds, extends sla_due_at by the same |
-| IN_PROGRESS (from RESOLVED, revert) | resolved_at=NULL, clears sla_paused_at, nudge_count=0, next_nudge_at=NULL, extends sla_due_at by time spent RESOLVED |
-| REOPENED | reopen_count=1, resolved_at=NULL, clears sla_paused_at, next_nudge_at=NULL, recomputes sla_due_at |
+| IN_PROGRESS (from RESOLVED, revert) | resolved_at=NULL, nudge_count=0, next_nudge_at=NULL; credits the time spent RESOLVED (same as leaving ON_HOLD: adds it to total_paused_seconds, extends sla_due_at by it, clears sla_paused_at) |
+| REOPENED | reopen_count=1, resolved_at=NULL, clears sla_paused_at (not credited), next_nudge_at=NULL, sla_due_at = now + category.sla_hours × reopen factor (see below); total_paused_seconds unchanged |
 
 Any exit from ON_HOLD (transitions 10 and 11) clears hold_* (the
 `hold_fields_consistent` CHECK requires it) and, if the hold paused the
@@ -229,6 +229,35 @@ so paused time is never lost.
 
 State that has no meaning in the target status is set to NULL rather than
 left stale, even where no index or query would currently read it.
+
+### Reopen SLA window
+
+A reopened grievance gets a **fresh, shortened** SLA window:
+
+```
+sla_due_at = reopened_at + category.sla_hours × grievance.sla.reopen-factor
+```
+
+`grievance.sla.reopen-factor` is a configuration property, default `0.5`,
+valid range **0 < factor <= 1.0**. Anything outside it fails startup. A
+factor above 1 would give a reopened grievance *more* time than the
+original window, inverting the rule's purpose and silently weakening SLA
+enforcement.
+The window is rounded to whole seconds, like the pause arithmetic.
+`total_paused_seconds` is history: it is not carried into the new window,
+which is computed fresh.
+
+Why not the alternatives:
+
+- **A full fresh window** would reward premature resolution. A department
+  under deadline pressure could resolve early to stop the clock, then get
+  a whole new window when the citizen reopens.
+- **Keeping the original deadline** would make the reopened grievance
+  instantly breached and indistinguishable from one that has been rotting
+  for weeks, so nobody could prioritise it.
+- **A shortened fresh window** says what happened: the first attempt
+  failed, there is less time than originally, and the clock is visibly
+  running.
 
 ### Why three methods, not one
 

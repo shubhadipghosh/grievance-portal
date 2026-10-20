@@ -204,7 +204,23 @@ public class Grievance {
         if (target == GrievanceStatus.ON_HOLD) {
             throw new IllegalArgumentException("ON_HOLD needs hold details; use applyHold");
         }
+        if (target == GrievanceStatus.REOPENED) {
+            throw new IllegalArgumentException("REOPENED needs the reopen SLA factor; use applyReopen");
+        }
         moveTo(target, now);
+    }
+
+    /**
+     * REOPENED (transitions 13, 16): a fresh, shortened SLA window starting now.
+     * total_paused_seconds is history and is not carried into the new window.
+     *
+     * @param reopenSlaFactor fraction of the category's SLA the reopened cycle gets
+     */
+    void applyReopen(double reopenSlaFactor, OffsetDateTime now) {
+        Objects.requireNonNull(now, "now");
+        long windowSeconds = Math.round(category.getSlaHours() * 3600L * reopenSlaFactor);
+        slaDueAt = now.plusSeconds(windowSeconds);
+        moveTo(GrievanceStatus.REOPENED, now);
     }
 
     /** ASSIGNED (transitions 3, 17): sets the assignee and status together. */
@@ -239,13 +255,7 @@ public class Grievance {
         if (status == GrievanceStatus.ON_HOLD) {
             // Any exit from ON_HOLD (transitions 10 and 11). If the hold paused the
             // clock, credit the pause before the target's own side effects run.
-            // Whole seconds for both, so the total and the extension agree exactly.
-            if (slaPausedAt != null) {
-                long paused = Duration.between(slaPausedAt, now).getSeconds();
-                totalPausedSeconds += paused;
-                slaDueAt = slaDueAt.plusSeconds(paused);
-                slaPausedAt = null;
-            }
+            creditPause(now);
             // hold_fields_consistent requires these null outside ON_HOLD.
             holdReasonType = null;
             holdOwnerType = null;
@@ -271,18 +281,18 @@ public class Grievance {
             case REOPENED -> {
                 reopenCount = 1;
                 resolvedAt = null;
+                // Fresh clock (set by applyReopen), so the stop is not credited.
                 slaPausedAt = null;
                 nextNudgeAt = null;
-                // TODO(SLA): recompute slaDueAt for the reopened cycle.
             }
             case IN_PROGRESS -> {
                 if (status == GrievanceStatus.RESOLVED) {
-                    // Staff revert (transition 14): undo the resolution.
+                    // Staff revert (transition 14): undo the resolution. RESOLVED
+                    // stopped the clock, so the time spent there is credited.
                     resolvedAt = null;
-                    slaPausedAt = null;
+                    creditPause(now);
                     nudgeCount = 0;
                     nextNudgeAt = null;
-                    // TODO(SLA): extend slaDueAt by the time spent RESOLVED.
                 }
             }
             case ACKNOWLEDGED, ASSIGNED, ON_HOLD -> {
@@ -291,6 +301,20 @@ public class Grievance {
                     throw new IllegalArgumentException("applyTransition does not handle " + target);
         }
         status = target;
+    }
+
+    /**
+     * Ends a clock stop: adds the stopped time to totalPausedSeconds and extends
+     * slaDueAt by the same amount. Whole seconds for both, so they agree exactly.
+     */
+    private void creditPause(OffsetDateTime now) {
+        if (slaPausedAt == null) {
+            return;
+        }
+        long paused = Duration.between(slaPausedAt, now).getSeconds();
+        totalPausedSeconds += paused;
+        slaDueAt = slaDueAt.plusSeconds(paused);
+        slaPausedAt = null;
     }
 
     private void startNudgeCycle(OffsetDateTime now) {

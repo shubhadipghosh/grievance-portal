@@ -17,6 +17,7 @@ import com.shubha.grievanceportal.shared.NotFoundException;
 import com.shubha.grievanceportal.shared.ReasonRequiredException;
 import com.shubha.grievanceportal.shared.ReopenLimitReachedException;
 import jakarta.persistence.EntityManager;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,16 +36,25 @@ class GrievanceTransitionServiceImpl implements GrievanceTransitionService {
     private final GrievanceAuthorization authorization;
     private final AuthorizationQuery authorizationQuery;
     private final EntityManager entityManager;
+    private final double reopenSlaFactor;
 
     GrievanceTransitionServiceImpl(GrievanceRepository grievances, GrievanceStatusHistoryRepository history,
                                    GrievanceAssignmentRepository assignments, GrievanceAuthorization authorization,
-                                   AuthorizationQuery authorizationQuery, EntityManager entityManager) {
+                                   AuthorizationQuery authorizationQuery, EntityManager entityManager,
+                                   @Value("${grievance.sla.reopen-factor:0.5}") double reopenSlaFactor) {
+        // A reopen means the first resolution failed: the window may shrink, never grow.
+        // Written as a negated range so NaN is rejected too.
+        if (!(reopenSlaFactor > 0 && reopenSlaFactor <= 1.0)) {
+            throw new IllegalArgumentException(
+                    "grievance.sla.reopen-factor must satisfy 0 < factor <= 1.0: " + reopenSlaFactor);
+        }
         this.grievances = grievances;
         this.history = history;
         this.assignments = assignments;
         this.authorization = authorization;
         this.authorizationQuery = authorizationQuery;
         this.entityManager = entityManager;
+        this.reopenSlaFactor = reopenSlaFactor;
     }
 
     @Override
@@ -58,7 +68,12 @@ class GrievanceTransitionServiceImpl implements GrievanceTransitionService {
         GrievanceStatus from = grievance.getStatus();
 
         // 6. Side effects
-        grievance.applyTransition(target, OffsetDateTime.now());
+        OffsetDateTime now = OffsetDateTime.now();
+        if (target == GrievanceStatus.REOPENED) {
+            grievance.applyReopen(reopenSlaFactor, now);
+        } else {
+            grievance.applyTransition(target, now);
+        }
 
         recordAndSave(grievance, from, target, actorId, reason);
     }
