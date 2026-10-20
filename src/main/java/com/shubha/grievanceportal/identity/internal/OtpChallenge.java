@@ -42,6 +42,13 @@ public class OtpChallenge {
     @Column(name = "consumed_at")
     private OffsetDateTime consumedAt;
 
+    @Column(name = "verified_at")
+    private OffsetDateTime verifiedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "burned_reason", length = 30)
+    private BurnReason burnedReason;
+
     // DB default now(); null on a freshly persisted instance until reloaded.
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -88,11 +95,39 @@ public class OtpChallenge {
         return consumedAt;
     }
 
-    public void consume(OffsetDateTime at) {
+    public OffsetDateTime getVerifiedAt() {
+        return verifiedAt;
+    }
+
+    public BurnReason getBurnedReason() {
+        return burnedReason;
+    }
+
+    /**
+     * Burns the challenge without a successful verification. consumed_at and
+     * burned_reason are set together, as consumed_has_reason requires.
+     *
+     * @throws IllegalArgumentException reason is VERIFIED; use {@link #verify}
+     */
+    public void consume(OffsetDateTime at, BurnReason reason) {
+        if (Objects.requireNonNull(reason, "reason") == BurnReason.VERIFIED) {
+            throw new IllegalArgumentException("Use verify() to record a successful verification");
+        }
+        finish(at, reason);
+    }
+
+    /** The code matched: consumes the challenge and records when it was verified. */
+    public void verify(OffsetDateTime at) {
+        finish(at, BurnReason.VERIFIED);
+        this.verifiedAt = at;
+    }
+
+    private void finish(OffsetDateTime at, BurnReason reason) {
         if (consumedAt != null) {
             throw new IllegalStateException("OTP challenge " + id + " already consumed");
         }
         this.consumedAt = Objects.requireNonNull(at, "at");
+        this.burnedReason = reason;
     }
 
     public OffsetDateTime getCreatedAt() {

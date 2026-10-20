@@ -82,7 +82,8 @@ class IdentityRepositoriesTest {
 
     @Test
     void rolePermissionsUseCompositeKey() {
-        // DEPT_ADMIN and its grievance permissions are seeded by V4 and V5; USER_MANAGE is not granted to it.
+        // DEPT_ADMIN and its grievance permissions are seeded by V4 and V5, CITIZEN_LIMIT_OVERRIDE by V7;
+        // USER_MANAGE is not granted to it.
         Role role = roles.findByCode("DEPT_ADMIN").orElseThrow();
         Permission userManage = permissions.findById("USER_MANAGE").orElseThrow();
         rolePermissions.save(new RolePermission(role, userManage));
@@ -95,7 +96,7 @@ class IdentityRepositoriesTest {
                         "GRIEVANCE_TRIAGE", "GRIEVANCE_ASSIGN", "GRIEVANCE_WORK",
                         "GRIEVANCE_HOLD", "GRIEVANCE_REJECT", "GRIEVANCE_REVERT",
                         "GRIEVANCE_VIEW", "GRIEVANCE_VIEW_INTERNAL", "GRIEVANCE_COMMENT", "GRIEVANCE_CLOSE", "REPORT_VIEW",
-                        "USER_MANAGE");
+                        "CITIZEN_LIMIT_OVERRIDE", "USER_MANAGE");
         assertThat(roles.findByCode("DEPT_ADMIN")).contains(role);
     }
 
@@ -145,7 +146,11 @@ class IdentityRepositoriesTest {
         String phone = "+919800000003";
         OffsetDateTime expiry = OffsetDateTime.now().plusMinutes(5);
         OtpChallenge first = otps.saveAndFlush(new OtpChallenge(phone, "h1", OtpPurpose.LOGIN, expiry));
-        first.consume(OffsetDateTime.now());
+        first.consume(OffsetDateTime.now(), BurnReason.SUPERSEDED);
+        // uq_live_otp_per_phone allows one live LOGIN challenge. Flush the consume
+        // now: Hibernate runs pending inserts before updates, so otherwise the
+        // second insert would hit the index while the first is still live.
+        otps.flush();
         OtpChallenge second = otps.saveAndFlush(new OtpChallenge(phone, "h2", OtpPurpose.LOGIN, expiry));
         second.recordAttempt();
         otps.saveAndFlush(new OtpChallenge(phone, "h3", OtpPurpose.VERIFY_PHONE, expiry));
@@ -156,5 +161,29 @@ class IdentityRepositoriesTest {
                 .orElseThrow();
         assertThat(open).isEqualTo(second);
         assertThat(open.getAttempts()).isEqualTo((short) 1);
+    }
+
+    @Test
+    void verifySetsConsumedVerifiedAndReasonTogether() {
+        OtpChallenge challenge = otps.saveAndFlush(new OtpChallenge("+919800000004", "h1", OtpPurpose.LOGIN,
+                OffsetDateTime.now().plusMinutes(5)));
+        OffsetDateTime at = OffsetDateTime.now();
+        challenge.verify(at);
+        otps.flush();
+        em.clear();
+
+        OtpChallenge loaded = otps.findById(challenge.getId()).orElseThrow();
+        assertThat(loaded.getBurnedReason()).isEqualTo(BurnReason.VERIFIED);
+        assertThat(loaded.getConsumedAt()).isNotNull();
+        assertThat(loaded.getVerifiedAt()).isEqualTo(loaded.getConsumedAt());
+    }
+
+    @Test
+    void consumeRejectsVerifiedReason() {
+        OtpChallenge challenge = new OtpChallenge("+919800000005", "h1", OtpPurpose.LOGIN,
+                OffsetDateTime.now().plusMinutes(5));
+        assertThatThrownBy(() -> challenge.consume(OffsetDateTime.now(), BurnReason.VERIFIED))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(challenge.getConsumedAt()).isNull();
     }
 }
