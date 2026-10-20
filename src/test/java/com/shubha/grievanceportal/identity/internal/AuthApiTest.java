@@ -4,6 +4,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.shubha.grievanceportal.TestcontainersConfiguration;
 import com.shubha.grievanceportal.identity.AppUser;
 import com.shubha.grievanceportal.identity.CurrentUser;
+import com.shubha.grievanceportal.identity.TestUserStatus;
 import com.shubha.grievanceportal.identity.UserStatus;
 import com.shubha.grievanceportal.identity.UserType;
 import jakarta.servlet.http.Cookie;
@@ -221,7 +222,7 @@ class AuthApiTest {
     void everyStaffLoginFailureLooksTheSame() throws Exception {
         staff("auth-test-2@example.test");
         AppUser locked = staff("auth-test-3@example.test");
-        locked.setStatus(UserStatus.LOCKED);
+        TestUserStatus.force(locked, UserStatus.LOCKED);
         users.save(locked);
         AppUser citizenWithEmail = AppUser.citizen(phone(5), null);
         citizenWithEmail.setEmail("auth-test-4@example.test");

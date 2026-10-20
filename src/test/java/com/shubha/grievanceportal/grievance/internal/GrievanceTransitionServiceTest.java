@@ -7,6 +7,7 @@ import com.shubha.grievanceportal.grievance.HoldOwnerType;
 import com.shubha.grievanceportal.grievance.HoldReasonType;
 import com.shubha.grievanceportal.identity.AppUser;
 import com.shubha.grievanceportal.identity.AuthorizationQuery;
+import com.shubha.grievanceportal.identity.TestUserStatus;
 import com.shubha.grievanceportal.identity.UserStatus;
 import com.shubha.grievanceportal.organization.Category;
 import com.shubha.grievanceportal.organization.Department;
@@ -419,7 +420,7 @@ class GrievanceTransitionServiceTest {
     @Test
     void suspendedStaffIsAnIneligibleAssignee() {
         transition(ACKNOWLEDGED, admin, null);
-        em.find(AppUser.class, officer.getId()).setStatus(UserStatus.LOCKED);
+        TestUserStatus.force(em.find(AppUser.class, officer.getId()), UserStatus.LOCKED);
         em.flush();
 
         assertThatThrownBy(() -> service.assign(grievance.getId(), officer.getId(), admin.getId(), null))
@@ -507,7 +508,7 @@ class GrievanceTransitionServiceTest {
     void staffHoldRequiresAnActiveStaffOwner() {
         forceInProgress();
         AppUser locked = staff("Locked Officer");
-        locked.setStatus(UserStatus.LOCKED);
+        TestUserStatus.force(locked, UserStatus.LOCKED);
         em.flush();
 
         assertHoldRejected(AWAITING_DEPARTMENT, STAFF, null, null);

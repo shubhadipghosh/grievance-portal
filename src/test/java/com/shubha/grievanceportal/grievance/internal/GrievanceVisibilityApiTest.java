@@ -3,6 +3,7 @@ package com.shubha.grievanceportal.grievance.internal;
 import com.jayway.jsonpath.JsonPath;
 import com.shubha.grievanceportal.TestcontainersConfiguration;
 import com.shubha.grievanceportal.identity.AppUser;
+import com.shubha.grievanceportal.identity.TestUserStatus;
 import com.shubha.grievanceportal.identity.UserStatus;
 import com.shubha.grievanceportal.organization.Category;
 import com.shubha.grievanceportal.organization.Department;
@@ -141,7 +142,7 @@ class GrievanceVisibilityApiTest {
 
     @Test
     void lockedCitizenCannotSeeTheirOwnGrievance() throws Exception {
-        owner.setStatus(UserStatus.LOCKED);
+        TestUserStatus.force(owner, UserStatus.LOCKED);
         em.flush();
         expectVisible(owner);
     }

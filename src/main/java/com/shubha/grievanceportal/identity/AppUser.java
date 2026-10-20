@@ -156,7 +156,8 @@ public class AppUser {
         return status;
     }
 
-    public void setStatus(UserStatus status) {
+    // Package-private: UserStatusService.changeUserStatus is the only path, and it is audited.
+    void setStatus(UserStatus status) {
         this.status = Objects.requireNonNull(status, "status");
     }
 

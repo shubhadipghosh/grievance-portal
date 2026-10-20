@@ -3,6 +3,7 @@ package com.shubha.grievanceportal.grievance.internal;
 import com.shubha.grievanceportal.TestcontainersConfiguration;
 import com.shubha.grievanceportal.identity.AppUser;
 import com.shubha.grievanceportal.identity.AuthorizationQuery;
+import com.shubha.grievanceportal.identity.TestUserStatus;
 import com.shubha.grievanceportal.identity.UserStatus;
 import com.shubha.grievanceportal.organization.Category;
 import com.shubha.grievanceportal.organization.Department;
@@ -107,7 +108,7 @@ class GrievanceAuthorizationTest {
     }
 
     void suspend(AppUser user) {
-        user.setStatus(UserStatus.LOCKED);
+        TestUserStatus.force(user, UserStatus.LOCKED);
         em.flush();
     }
 

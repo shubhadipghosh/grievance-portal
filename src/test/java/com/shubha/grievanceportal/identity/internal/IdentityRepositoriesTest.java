@@ -15,7 +15,10 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -83,6 +86,18 @@ class IdentityRepositoriesTest {
                 .executeUpdate())
                 .rootCause()
                 .hasMessageContaining("email_lowercase");
+    }
+
+    @Test
+    void appUserExposesNoPublicStatusSetter() {
+        // Status gates every authorization check; it changes only through the audited
+        // UserStatusService. The rest are profile fields.
+        assertThat(Arrays.stream(AppUser.class.getDeclaredMethods())
+                .filter(m -> Modifier.isPublic(m.getModifiers()))
+                .map(Method::getName)
+                .filter(name -> name.startsWith("set")))
+                .containsExactlyInAnyOrder("setPhone", "setEmail", "setPasswordHash", "setFullName",
+                        "setPreferredLocale");
     }
 
     @Test
