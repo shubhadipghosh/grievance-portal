@@ -23,8 +23,10 @@ public interface GrievanceService {
     GrievanceDetails getByTicketNo(String ticketNo);
 
     /**
-     * Open grievances in one department and status, most urgent (earliest SLA
-     * deadline) first. Any sort on the pageable is ignored.
+     * Open grievances in one department and status that the actor can view,
+     * most urgent (earliest SLA deadline) first. Any sort on the pageable is
+     * ignored. Filtered in the query, so pages and totals count only what the
+     * actor can see.
      */
-    Page<GrievanceSummary> queue(UUID departmentId, GrievanceStatus status, Pageable pageable);
+    Page<GrievanceSummary> queue(UUID actorId, UUID departmentId, GrievanceStatus status, Pageable pageable);
 }

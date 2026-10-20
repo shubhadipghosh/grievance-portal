@@ -41,10 +41,13 @@ class GrievanceController {
 
     private final GrievanceService grievances;
     private final GrievanceTransitionService transitions;
+    private final GrievanceViewGate viewGate;
 
-    GrievanceController(GrievanceService grievances, GrievanceTransitionService transitions) {
+    GrievanceController(GrievanceService grievances, GrievanceTransitionService transitions,
+                        GrievanceViewGate viewGate) {
         this.grievances = grievances;
         this.transitions = transitions;
+        this.viewGate = viewGate;
     }
 
     record ReasonRequest(@Size(max = 1000) String reason) {
@@ -68,14 +71,14 @@ class GrievanceController {
 
     @GetMapping("/{id}")
     GrievanceDetails get(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id) {
-        // TODO(canView): gate first; not visible -> 404, same as a missing grievance.
+        viewGate.requireVisible(actor.id(), id);
         return grievances.get(id);
     }
 
     /** Citizens look up by ticket number; everything else addresses by id. */
     @GetMapping(params = "ticketNo")
     GrievanceDetails getByTicketNo(@AuthenticationPrincipal CurrentUser actor, @RequestParam String ticketNo) {
-        // TODO(canView): gate first; not visible -> 404, same as a missing ticket.
+        viewGate.requireVisibleByTicketNo(actor.id(), ticketNo);
         return grievances.getByTicketNo(ticketNo);
     }
 
@@ -84,14 +87,13 @@ class GrievanceController {
                                        @RequestParam UUID departmentId,
                                        @RequestParam GrievanceStatus status,
                                        @PageableDefault(size = 20) Pageable pageable) {
-        // TODO(canView): restrict to grievances within the actor's granted scope.
-        return new PagedModel<>(grievances.queue(departmentId, status, pageable));
+        return new PagedModel<>(grievances.queue(actor.id(), departmentId, status, pageable));
     }
 
     @PostMapping("/{id}/acknowledge")
     GrievanceDetails acknowledge(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,
                                  @Valid @RequestBody(required = false) ReasonRequest body) {
-        // TODO(canView): gate first; not visible -> 404.
+        viewGate.requireVisible(actor.id(), id);
         transitions.transition(id, GrievanceStatus.ACKNOWLEDGED, actor.id(), reason(body));
         return grievances.get(id);
     }
@@ -99,7 +101,7 @@ class GrievanceController {
     @PostMapping("/{id}/assign")
     GrievanceDetails assign(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,
                             @Valid @RequestBody AssignRequest body) {
-        // TODO(canView): gate first; not visible -> 404.
+        viewGate.requireVisible(actor.id(), id);
         transitions.assign(id, body.assigneeId(), actor.id(), body.reason());
         return grievances.get(id);
     }
@@ -107,7 +109,7 @@ class GrievanceController {
     @PostMapping("/{id}/hold")
     GrievanceDetails hold(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,
                           @Valid @RequestBody HoldRequest body) {
-        // TODO(canView): gate first; not visible -> 404.
+        viewGate.requireVisible(actor.id(), id);
         transitions.placeOnHold(id, body.reasonType(), body.ownerType(), body.holdOwnerId(),
                 body.holdOwnerNote(), actor.id(), body.reason());
         return grievances.get(id);
@@ -116,7 +118,7 @@ class GrievanceController {
     @PostMapping("/{id}/resolve")
     GrievanceDetails resolve(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,
                              @Valid @RequestBody(required = false) ReasonRequest body) {
-        // TODO(canView): gate first; not visible -> 404.
+        viewGate.requireVisible(actor.id(), id);
         transitions.transition(id, GrievanceStatus.RESOLVED, actor.id(), reason(body));
         return grievances.get(id);
     }
@@ -125,7 +127,7 @@ class GrievanceController {
     @PostMapping("/{id}/close")
     GrievanceDetails close(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,
                            @Valid @RequestBody(required = false) ReasonRequest body) {
-        // TODO(canView): gate first; not visible -> 404.
+        viewGate.requireVisible(actor.id(), id);
         transitions.transition(id, GrievanceStatus.CLOSED, actor.id(), reason(body));
         return grievances.get(id);
     }

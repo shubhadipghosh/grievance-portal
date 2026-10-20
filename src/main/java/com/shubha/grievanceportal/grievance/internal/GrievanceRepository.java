@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,7 +31,11 @@ public interface GrievanceRepository extends JpaRepository<Grievance, UUID> {
     /** Citizen "my grievances" page; idx_grv_citizen. */
     Page<Grievance> findByCitizenIdOrderBySubmittedAtDesc(UUID citizenId, Pageable pageable);
 
-    /** Department queue filtered by one open status; idx_grv_dept_open. */
+    /**
+     * Department queue filtered by one open status, limited to what the actor
+     * can view (GrievanceAuthorization.canView): the visible wards, plus the
+     * actor's own grievances if they are an ACTIVE citizen. idx_grv_dept_open.
+     */
     @Query("""
             select g from Grievance g
             where g.department.id = :departmentId
@@ -38,11 +43,18 @@ public interface GrievanceRepository extends JpaRepository<Grievance, UUID> {
               and g.status not in (
                   com.shubha.grievanceportal.grievance.GrievanceStatus.CLOSED,
                   com.shubha.grievanceportal.grievance.GrievanceStatus.REJECTED)
+              and (:allWards = true
+                   or g.ward.id in :wardIds
+                   or (g.citizen.id = :actorId
+                       and g.citizen.status = com.shubha.grievanceportal.identity.UserStatus.ACTIVE))
             order by g.slaDueAt
             """)
-    Page<Grievance> findOpenByDepartmentAndStatus(@Param("departmentId") UUID departmentId,
-                                                  @Param("status") GrievanceStatus status,
-                                                  Pageable pageable);
+    Page<Grievance> findOpenVisibleByDepartmentAndStatus(@Param("actorId") UUID actorId,
+                                                         @Param("allWards") boolean allWards,
+                                                         @Param("wardIds") Collection<UUID> wardIds,
+                                                         @Param("departmentId") UUID departmentId,
+                                                         @Param("status") GrievanceStatus status,
+                                                         Pageable pageable);
 
     /** Field officer "my work"; idx_grv_assignee. */
     @Query("""

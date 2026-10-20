@@ -224,7 +224,9 @@ All mappings live in `shared.ApiExceptionHandler`, as RFC 9457 ProblemDetail:
 | anything else | 500, generic detail, logged; no message or stack trace |
 
 `canView` is not transition-specific: every read endpoint uses the same
-gate.
+gate. Lists apply it inside their query rather than after it, so pages and
+totals count only what the actor may see; a list never contains a
+grievance the actor could not fetch directly.
 
 ### Side effects by target state
 

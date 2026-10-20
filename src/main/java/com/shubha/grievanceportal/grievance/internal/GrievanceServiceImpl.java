@@ -33,14 +33,16 @@ class GrievanceServiceImpl implements GrievanceService {
 
     private final GrievanceRepository grievances;
     private final GrievanceStatusHistoryRepository history;
+    private final GrievanceAuthorization authorization;
     private final EntityManager entityManager;
     private final ZoneId displayZone;
 
     GrievanceServiceImpl(GrievanceRepository grievances, GrievanceStatusHistoryRepository history,
-                         EntityManager entityManager,
+                         GrievanceAuthorization authorization, EntityManager entityManager,
                          @Value("${app.display-zone:Asia/Kolkata}") ZoneId displayZone) {
         this.grievances = grievances;
         this.history = history;
+        this.authorization = authorization;
         this.entityManager = entityManager;
         this.displayZone = displayZone;
     }
@@ -96,10 +98,14 @@ class GrievanceServiceImpl implements GrievanceService {
     }
 
     @Override
-    public Page<GrievanceSummary> queue(UUID departmentId, GrievanceStatus status, Pageable pageable) {
+    public Page<GrievanceSummary> queue(UUID actorId, UUID departmentId, GrievanceStatus status,
+                                        Pageable pageable) {
+        Objects.requireNonNull(actorId, "actorId");
+        GrievanceAuthorization.VisibleWards visible = authorization.visibleWards(actorId, departmentId);
         // The query fixes the order (SLA deadline); a client-supplied sort is dropped.
         Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
-        return grievances.findOpenByDepartmentAndStatus(departmentId, status, unsorted)
+        return grievances.findOpenVisibleByDepartmentAndStatus(actorId, visible.all(), visible.wardIds(),
+                        departmentId, status, unsorted)
                 .map(GrievanceServiceImpl::summary);
     }
 

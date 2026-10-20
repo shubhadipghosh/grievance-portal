@@ -23,6 +23,7 @@ import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -160,11 +161,11 @@ class GrievanceRepositoriesTest {
                 .containsExactly(late);
         assertThat(grievances.findOpenByAssignee(officer.getId(), PageRequest.of(0, 10)))
                 .containsExactly(onHold, late, notDue);
-        assertThat(grievances.findOpenByDepartmentAndStatus(dept.getId(), GrievanceStatus.IN_PROGRESS,
-                PageRequest.of(0, 10)))
+        assertThat(grievances.findOpenVisibleByDepartmentAndStatus(null, true, Set.of(), dept.getId(),
+                GrievanceStatus.IN_PROGRESS, PageRequest.of(0, 10)))
                 .containsExactly(late, notDue);
-        assertThat(grievances.findOpenByDepartmentAndStatus(dept.getId(), GrievanceStatus.CLOSED,
-                PageRequest.of(0, 10)))
+        assertThat(grievances.findOpenVisibleByDepartmentAndStatus(null, true, Set.of(), dept.getId(),
+                GrievanceStatus.CLOSED, PageRequest.of(0, 10)))
                 .isEmpty();
     }
 
