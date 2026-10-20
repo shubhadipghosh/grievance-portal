@@ -49,9 +49,9 @@ public class GrievanceStatusHistory {
     @Column(name = "to_status", nullable = false, length = 20, updatable = false)
     private GrievanceStatus toStatus;
 
-    // Null = system (e.g. SLA job).
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "actor_id", updatable = false)
+    // Automated changes use the SYSTEM user (SystemActor.ID), never null.
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "actor_id", nullable = false, updatable = false)
     private AppUser actor;
 
     @Column(name = "reason", length = 1000, updatable = false)
@@ -66,7 +66,6 @@ public class GrievanceStatusHistory {
 
     /**
      * @param fromStatus null for the initial SUBMITTED row
-     * @param actor      null when the system made the change
      * @param reason     nullable
      */
     public GrievanceStatusHistory(Grievance grievance, GrievanceStatus fromStatus, GrievanceStatus toStatus,
@@ -74,7 +73,7 @@ public class GrievanceStatusHistory {
         this.grievance = Objects.requireNonNull(grievance, "grievance");
         this.fromStatus = fromStatus;
         this.toStatus = Objects.requireNonNull(toStatus, "toStatus");
-        this.actor = actor;
+        this.actor = Objects.requireNonNull(actor, "actor");
         this.reason = reason;
     }
 

@@ -32,10 +32,10 @@ status rules live. No other code may set `grievance.status`.
 | 9 | IN_PROGRESS | REJECTED | GRIEVANCE_REJECT | **yes** | Notifies all participants |
 | 10 | ON_HOLD | IN_PROGRESS | GRIEVANCE_HOLD | no | Dependency cleared |
 | 11 | ON_HOLD | REJECTED | GRIEVANCE_REJECT | **yes** | |
-| 12 | RESOLVED | CLOSED | — (system or citizen) | no | Citizen confirms, or auto after nudge cycle |
+| 12 | RESOLVED | CLOSED | CITIZEN_OWNER, GRIEVANCE_CLOSE_AUTO | no | Citizen confirms, or auto after nudge cycle |
 | 13 | RESOLVED | REOPENED | — (citizen, own grievance) | **yes** | Only if reopen_count = 0 |
 | 14 | RESOLVED | IN_PROGRESS | GRIEVANCE_REVERT | **yes** | Staff error correction, dept admin+ |
-| 15 | REJECTED | CLOSED | — (system or citizen) | no | Citizen acknowledges, or auto after nudge cycle |
+| 15 | REJECTED | CLOSED | CITIZEN_OWNER, GRIEVANCE_CLOSE_AUTO | no | Citizen acknowledges, or auto after nudge cycle |
 | 16 | REJECTED | REOPENED | — (citizen, own grievance) | **yes** | Dispute. Only if reopen_count = 0 |
 | 17 | REOPENED | ASSIGNED | GRIEVANCE_ASSIGN | no | Back into the normal cycle |
 | 18 | REOPENED | REJECTED | GRIEVANCE_REJECT | **yes** | |
@@ -107,6 +107,8 @@ assignee, and the department admin, and `next_review_at` moves forward.
 | GRIEVANCE_REVERT | dept admin, super admin |
 | GRIEVANCE_VIEW_INTERNAL | all staff |
 | GRIEVANCE_COMMENT | all staff |
+| GRIEVANCE_CLOSE | dept admin, super admin |
+| GRIEVANCE_CLOSE_AUTO | SYSTEM user only |
 
 Field officers deliberately cannot reject, hold, or revert. Those are
 decisions with accountability attached and belong to someone supervising.

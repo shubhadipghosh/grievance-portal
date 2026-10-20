@@ -82,7 +82,7 @@ class IdentityRepositoriesTest {
 
     @Test
     void rolePermissionsUseCompositeKey() {
-        // DEPT_ADMIN and its grievance permissions are seeded by V4; USER_MANAGE is not granted to it.
+        // DEPT_ADMIN and its grievance permissions are seeded by V4 and V5; USER_MANAGE is not granted to it.
         Role role = roles.findByCode("DEPT_ADMIN").orElseThrow();
         Permission userManage = permissions.findById("USER_MANAGE").orElseThrow();
         rolePermissions.save(new RolePermission(role, userManage));
@@ -94,7 +94,7 @@ class IdentityRepositoriesTest {
                 .containsExactlyInAnyOrder(
                         "GRIEVANCE_TRIAGE", "GRIEVANCE_ASSIGN", "GRIEVANCE_WORK",
                         "GRIEVANCE_HOLD", "GRIEVANCE_REJECT", "GRIEVANCE_REVERT",
-                        "GRIEVANCE_VIEW_INTERNAL", "GRIEVANCE_COMMENT", "REPORT_VIEW",
+                        "GRIEVANCE_VIEW_INTERNAL", "GRIEVANCE_COMMENT", "GRIEVANCE_CLOSE", "REPORT_VIEW",
                         "USER_MANAGE");
         assertThat(roles.findByCode("DEPT_ADMIN")).contains(role);
     }
