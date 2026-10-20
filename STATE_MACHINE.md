@@ -107,6 +107,18 @@ assignee, and the department admin, and `next_review_at` moves forward.
 The `hold_fields_consistent` CHECK makes it impossible to be ON_HOLD
 without recording `hold_reason_type`, `hold_owner_type` and `hold_since`.
 
+Hold owner rules (`placeOnHold`), checked after the actor is authorised:
+
+| hold_owner_type | hold_owner_id | hold_owner_note |
+|---|---|---|
+| CITIZEN | the grievance's own citizen (caller passes neither) | absent |
+| STAFF | required: an existing, ACTIVE staff user | optional |
+| EXTERNAL | absent (an external party is not a user) | required, names the party |
+
+**AWAITING_CITIZEN requires owner type CITIZEN.** The reason type alone
+decides whether the clock pauses, so a citizen-wait owned by anyone else
+would pause the SLA while the municipality waits on itself.
+
 ## Permissions
 
 | Code | Held by |
@@ -208,8 +220,12 @@ gate.
 | IN_PROGRESS (from RESOLVED, revert) | resolved_at=NULL, clears sla_paused_at, nudge_count=0, next_nudge_at=NULL, extends sla_due_at by time spent RESOLVED |
 | REOPENED | reopen_count=1, resolved_at=NULL, clears sla_paused_at, next_nudge_at=NULL, recomputes sla_due_at |
 
-Any exit from ON_HOLD clears hold_* (the `hold_fields_consistent` CHECK
-requires it), not only the move back to IN_PROGRESS.
+Any exit from ON_HOLD (transitions 10 and 11) clears hold_* (the
+`hold_fields_consistent` CHECK requires it) and, if the hold paused the
+clock, credits the pause first: whole seconds are added to
+total_paused_seconds and sla_due_at is extended by the same amount. On
+ON_HOLD → REJECTED this happens before REJECTED starts its own clock stop,
+so paused time is never lost.
 
 State that has no meaning in the target status is set to NULL rather than
 left stale, even where no index or query would currently read it.

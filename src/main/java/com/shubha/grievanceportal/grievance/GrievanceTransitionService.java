@@ -27,4 +27,19 @@ public interface GrievanceTransitionService {
      * @see #transition for the other failure modes
      */
     void assign(UUID grievanceId, UUID assigneeId, UUID actorId, String reason);
+
+    /**
+     * Transition 7 (IN_PROGRESS to ON_HOLD). Only AWAITING_CITIZEN pauses the SLA
+     * clock, and it requires owner type CITIZEN.
+     * <ul>
+     *   <li>CITIZEN: the grievance's own citizen; holdOwnerId and holdOwnerNote must be null</li>
+     *   <li>STAFF: holdOwnerId of an ACTIVE staff user; holdOwnerNote optional</li>
+     *   <li>EXTERNAL: holdOwnerNote names the party; holdOwnerId must be null</li>
+     * </ul>
+     *
+     * @throws com.shubha.grievanceportal.shared.InvalidHoldDetailsException owner details do not fit
+     * @see #transition for the other failure modes
+     */
+    void placeOnHold(UUID grievanceId, HoldReasonType reasonType, HoldOwnerType ownerType,
+                     UUID holdOwnerId, String holdOwnerNote, UUID actorId, String reason);
 }

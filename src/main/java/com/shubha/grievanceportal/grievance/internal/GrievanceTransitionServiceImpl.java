@@ -2,6 +2,8 @@ package com.shubha.grievanceportal.grievance.internal;
 
 import com.shubha.grievanceportal.grievance.GrievanceStatus;
 import com.shubha.grievanceportal.grievance.GrievanceTransitionService;
+import com.shubha.grievanceportal.grievance.HoldOwnerType;
+import com.shubha.grievanceportal.grievance.HoldReasonType;
 import com.shubha.grievanceportal.grievance.internal.GrievanceTransitions.Transition;
 import com.shubha.grievanceportal.identity.AppUser;
 import com.shubha.grievanceportal.identity.AuthorizationQuery;
@@ -9,6 +11,7 @@ import com.shubha.grievanceportal.identity.UserStatus;
 import com.shubha.grievanceportal.identity.UserType;
 import com.shubha.grievanceportal.shared.IllegalTransitionException;
 import com.shubha.grievanceportal.shared.IneligibleAssigneeException;
+import com.shubha.grievanceportal.shared.InvalidHoldDetailsException;
 import com.shubha.grievanceportal.shared.NotAuthorizedException;
 import com.shubha.grievanceportal.shared.NotFoundException;
 import com.shubha.grievanceportal.shared.ReasonRequiredException;
@@ -84,6 +87,24 @@ class GrievanceTransitionServiceImpl implements GrievanceTransitionService {
         recordAndSave(grievance, from, GrievanceStatus.ASSIGNED, actorId, reason);
     }
 
+    @Override
+    public void placeOnHold(UUID grievanceId, HoldReasonType reasonType, HoldOwnerType ownerType,
+                            UUID holdOwnerId, String holdOwnerNote, UUID actorId, String reason) {
+        Objects.requireNonNull(reasonType, "reasonType");
+        Objects.requireNonNull(ownerType, "ownerType");
+
+        Grievance grievance = loadAndCheck(grievanceId, GrievanceStatus.ON_HOLD, actorId, reason);
+        GrievanceStatus from = grievance.getStatus();
+
+        // Checked only after the actor is authorised, as for assign().
+        AppUser holdOwner = holdOwner(grievance, reasonType, ownerType, holdOwnerId, holdOwnerNote);
+
+        // 6. Side effects
+        grievance.applyHold(reasonType, ownerType, holdOwner, holdOwnerNote, OffsetDateTime.now());
+
+        recordAndSave(grievance, from, GrievanceStatus.ON_HOLD, actorId, reason);
+    }
+
     /** Steps 1-5. Returns the grievance, still in its original status. */
     private Grievance loadAndCheck(UUID grievanceId, GrievanceStatus target, UUID actorId, String reason) {
         Objects.requireNonNull(grievanceId, "grievanceId");
@@ -132,6 +153,44 @@ class GrievanceTransitionServiceImpl implements GrievanceTransitionService {
             throw new IneligibleAssigneeException(assigneeId, "no GRIEVANCE_WORK in this grievance's scope");
         }
         return assignee;
+    }
+
+    /** Validates the owner details and resolves the owning user; null for EXTERNAL. */
+    private AppUser holdOwner(Grievance grievance, HoldReasonType reasonType, HoldOwnerType ownerType,
+                              UUID holdOwnerId, String holdOwnerNote) {
+        // reasonType alone decides whether the clock pauses, so a citizen-wait must
+        // actually be owned by the citizen.
+        if (reasonType == HoldReasonType.AWAITING_CITIZEN && ownerType != HoldOwnerType.CITIZEN) {
+            throw new InvalidHoldDetailsException("AWAITING_CITIZEN requires owner type CITIZEN, got " + ownerType);
+        }
+        return switch (ownerType) {
+            case CITIZEN -> {
+                if (holdOwnerId != null || holdOwnerNote != null) {
+                    throw new InvalidHoldDetailsException(
+                            "CITIZEN hold owner is the grievance's citizen; holdOwnerId and holdOwnerNote must be absent");
+                }
+                yield grievance.getCitizen();
+            }
+            case STAFF -> {
+                if (holdOwnerId == null) {
+                    throw new InvalidHoldDetailsException("STAFF hold requires holdOwnerId");
+                }
+                AppUser owner = entityManager.find(AppUser.class, holdOwnerId);
+                if (owner == null || owner.getUserType() != UserType.STAFF || owner.getStatus() != UserStatus.ACTIVE) {
+                    throw new InvalidHoldDetailsException("Hold owner " + holdOwnerId + " is not an active staff user");
+                }
+                yield owner;
+            }
+            case EXTERNAL -> {
+                if (holdOwnerNote == null || holdOwnerNote.isBlank()) {
+                    throw new InvalidHoldDetailsException("EXTERNAL hold requires holdOwnerNote naming the party");
+                }
+                if (holdOwnerId != null) {
+                    throw new InvalidHoldDetailsException("EXTERNAL hold owner is not a user; holdOwnerId must be absent");
+                }
+                yield null;
+            }
+        };
     }
 
     /** Steps 7-8. */

@@ -3,6 +3,8 @@ package com.shubha.grievanceportal.grievance.internal;
 import com.shubha.grievanceportal.TestcontainersConfiguration;
 import com.shubha.grievanceportal.grievance.GrievanceStatus;
 import com.shubha.grievanceportal.grievance.GrievanceTransitionService;
+import com.shubha.grievanceportal.grievance.HoldOwnerType;
+import com.shubha.grievanceportal.grievance.HoldReasonType;
 import com.shubha.grievanceportal.identity.AppUser;
 import com.shubha.grievanceportal.identity.AuthorizationQuery;
 import com.shubha.grievanceportal.identity.UserStatus;
@@ -11,6 +13,7 @@ import com.shubha.grievanceportal.organization.Department;
 import com.shubha.grievanceportal.organization.Ward;
 import com.shubha.grievanceportal.shared.IllegalTransitionException;
 import com.shubha.grievanceportal.shared.IneligibleAssigneeException;
+import com.shubha.grievanceportal.shared.InvalidHoldDetailsException;
 import com.shubha.grievanceportal.shared.NotAuthorizedException;
 import com.shubha.grievanceportal.shared.NotFoundException;
 import com.shubha.grievanceportal.shared.ReasonRequiredException;
@@ -38,6 +41,12 @@ import static com.shubha.grievanceportal.grievance.GrievanceStatus.REJECTED;
 import static com.shubha.grievanceportal.grievance.GrievanceStatus.REOPENED;
 import static com.shubha.grievanceportal.grievance.GrievanceStatus.RESOLVED;
 import static com.shubha.grievanceportal.grievance.GrievanceStatus.SUBMITTED;
+import static com.shubha.grievanceportal.grievance.HoldOwnerType.CITIZEN;
+import static com.shubha.grievanceportal.grievance.HoldOwnerType.EXTERNAL;
+import static com.shubha.grievanceportal.grievance.HoldOwnerType.STAFF;
+import static com.shubha.grievanceportal.grievance.HoldReasonType.AWAITING_CITIZEN;
+import static com.shubha.grievanceportal.grievance.HoldReasonType.AWAITING_CONTRACTOR;
+import static com.shubha.grievanceportal.grievance.HoldReasonType.AWAITING_DEPARTMENT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
@@ -132,6 +141,42 @@ class GrievanceTransitionServiceTest {
         service.assign(grievance.getId(), assignee.getId(), actor.getId(), null);
         em.flush();
         em.clear();
+    }
+
+    void hold(HoldReasonType reasonType, HoldOwnerType ownerType, UUID ownerId, String note) {
+        service.placeOnHold(grievance.getId(), reasonType, ownerType, ownerId, note, admin.getId(), "waiting");
+        em.flush();
+        em.clear();
+    }
+
+    void assertHoldRejected(HoldReasonType reasonType, HoldOwnerType ownerType, UUID ownerId, String note) {
+        assertThatThrownBy(() -> service.placeOnHold(
+                grievance.getId(), reasonType, ownerType, ownerId, note, admin.getId(), "waiting"))
+                .as("%s / %s / id=%s / note=%s", reasonType, ownerType, ownerId, note)
+                .isInstanceOf(InvalidHoldDetailsException.class);
+    }
+
+    // Moves the pause start into the past so the paused duration is measurable.
+    void backdatePause(int hours) {
+        em.getEntityManager()
+                .createNativeQuery("update grievance set sla_paused_at = sla_paused_at - make_interval(hours => ?1) where id = ?2")
+                .setParameter(1, hours)
+                .setParameter(2, grievance.getId())
+                .executeUpdate();
+        em.clear();
+    }
+
+    // Mirrors the hold_fields_consistent CHECK.
+    void assertHoldFieldsMatchStatus(Grievance g) {
+        boolean onHold = g.getStatus() == ON_HOLD;
+        assertThat(g.getHoldReasonType() != null).as("hold_reason_type").isEqualTo(onHold);
+        assertThat(g.getHoldOwnerType() != null).as("hold_owner_type").isEqualTo(onHold);
+        assertThat(g.getHoldSince() != null).as("hold_since").isEqualTo(onHold);
+        assertThat(g.getNextReviewAt() != null).as("next_review_at").isEqualTo(onHold);
+        if (!onHold) {
+            assertThat(g.getHoldOwner()).isNull();
+            assertThat(g.getHoldOwnerNote()).isNull();
+        }
     }
 
     Grievance reload() {
@@ -390,5 +435,158 @@ class GrievanceTransitionServiceTest {
         assertThatThrownBy(() -> service.assign(grievance.getId(), officer.getId(), admin.getId(), null))
                 .isInstanceOf(IllegalTransitionException.class)
                 .hasMessageContaining("SUBMITTED");
+    }
+
+    // ---------------------------------------------------------------- placeOnHold
+
+    @Test
+    void citizenHoldIsOwnedByTheGrievancesCitizenAndPausesTheClock() {
+        forceInProgress();
+        hold(AWAITING_CITIZEN, CITIZEN, null, null);
+
+        Grievance g = reload();
+        assertThat(g.getStatus()).isEqualTo(ON_HOLD);
+        assertHoldFieldsMatchStatus(g);
+        assertThat(g.getHoldOwner().getId()).isEqualTo(citizen.getId());
+        assertThat(g.getHoldOwnerNote()).isNull();
+        assertThat(g.getNextReviewAt()).isEqualTo(g.getHoldSince().plusDays(7));
+        assertThat(g.getSlaPausedAt()).isEqualTo(g.getHoldSince());
+        assertThat(history.findByGrievanceIdOrderByOccurredAt(grievance.getId()))
+                .last()
+                .satisfies(h -> {
+                    assertThat(h.getFromStatus()).isEqualTo(IN_PROGRESS);
+                    assertThat(h.getToStatus()).isEqualTo(ON_HOLD);
+                    assertThat(h.getReason()).isEqualTo("waiting");
+                });
+    }
+
+    @Test
+    void staffHoldRecordsTheStaffOwnerAndKeepsTheClockRunning() {
+        forceInProgress();
+        hold(AWAITING_DEPARTMENT, STAFF, officer.getId(), null);
+
+        Grievance g = reload();
+        assertHoldFieldsMatchStatus(g);
+        assertThat(g.getHoldOwnerType()).isEqualTo(STAFF);
+        assertThat(g.getHoldOwner().getId()).isEqualTo(officer.getId());
+        assertThat(g.getSlaPausedAt()).isNull();
+    }
+
+    @Test
+    void externalHoldRecordsTheNamedPartyAndKeepsTheClockRunning() {
+        forceInProgress();
+        hold(AWAITING_CONTRACTOR, EXTERNAL, null, "Ganguly Contractors");
+
+        Grievance g = reload();
+        assertHoldFieldsMatchStatus(g);
+        assertThat(g.getHoldOwner()).isNull();
+        assertThat(g.getHoldOwnerNote()).isEqualTo("Ganguly Contractors");
+        assertThat(g.getSlaPausedAt()).isNull();
+    }
+
+    @Test
+    void staffHoldRequiresAnActiveStaffOwner() {
+        forceInProgress();
+        AppUser locked = staff("Locked Officer");
+        locked.setStatus(UserStatus.LOCKED);
+        em.flush();
+
+        assertHoldRejected(AWAITING_DEPARTMENT, STAFF, null, null);
+        assertHoldRejected(AWAITING_DEPARTMENT, STAFF, UUID.randomUUID(), null);
+        assertHoldRejected(AWAITING_DEPARTMENT, STAFF, citizen.getId(), null);
+        assertHoldRejected(AWAITING_DEPARTMENT, STAFF, locked.getId(), null);
+        assertThat(reload().getStatus()).isEqualTo(IN_PROGRESS);
+    }
+
+    @Test
+    void externalHoldRequiresANoteAndNoOwnerId() {
+        forceInProgress();
+
+        assertHoldRejected(AWAITING_CONTRACTOR, EXTERNAL, null, null);
+        assertHoldRejected(AWAITING_CONTRACTOR, EXTERNAL, null, "  ");
+        assertHoldRejected(AWAITING_CONTRACTOR, EXTERNAL, officer.getId(), "Ganguly Contractors");
+        assertThat(reload().getStatus()).isEqualTo(IN_PROGRESS);
+    }
+
+    @Test
+    void citizenHoldTakesNeitherOwnerIdNorNote() {
+        forceInProgress();
+
+        assertHoldRejected(AWAITING_CITIZEN, CITIZEN, citizen.getId(), null);
+        assertHoldRejected(AWAITING_CITIZEN, CITIZEN, null, "the citizen");
+        assertThat(reload().getStatus()).isEqualTo(IN_PROGRESS);
+    }
+
+    @Test
+    void awaitingCitizenCannotBeOwnedBySomeoneElse() {
+        // Otherwise the clock pauses while the municipality waits on itself.
+        forceInProgress();
+
+        assertHoldRejected(AWAITING_CITIZEN, EXTERNAL, null, "Ganguly Contractors");
+        assertHoldRejected(AWAITING_CITIZEN, STAFF, officer.getId(), null);
+    }
+
+    @Test
+    void holdRequiresAReasonAndHoldPermission() {
+        forceInProgress();
+
+        assertThatThrownBy(() -> service.placeOnHold(grievance.getId(), AWAITING_CITIZEN, CITIZEN,
+                null, null, admin.getId(), " "))
+                .isInstanceOf(ReasonRequiredException.class);
+        // Field officers cannot pause the SLA clock.
+        assertThatThrownBy(() -> service.placeOnHold(grievance.getId(), AWAITING_CITIZEN, CITIZEN,
+                null, null, officer.getId(), "waiting"))
+                .isInstanceOf(NotAuthorizedException.class);
+    }
+
+    // ---------------------------------------------------------------- release
+
+    @Test
+    void releasingACitizenHoldExtendsSlaByExactlyThePausedDuration() {
+        forceInProgress();
+        OffsetDateTime dueBefore = reload().getSlaDueAt();
+        hold(AWAITING_CITIZEN, CITIZEN, null, null);
+        backdatePause(2);
+
+        transition(IN_PROGRESS, admin, null);
+
+        Grievance g = reload();
+        assertThat(g.getStatus()).isEqualTo(IN_PROGRESS);
+        assertHoldFieldsMatchStatus(g);
+        assertThat(g.getSlaPausedAt()).isNull();
+        assertThat(g.getTotalPausedSeconds()).isBetween(7200L, 7260L);
+        assertThat(g.getSlaDueAt()).isEqualTo(dueBefore.plusSeconds(g.getTotalPausedSeconds()));
+    }
+
+    @Test
+    void releasingAContractorHoldLeavesSlaUntouched() {
+        forceInProgress();
+        OffsetDateTime dueBefore = reload().getSlaDueAt();
+        hold(AWAITING_CONTRACTOR, EXTERNAL, null, "Ganguly Contractors");
+
+        transition(IN_PROGRESS, admin, null);
+
+        Grievance g = reload();
+        assertHoldFieldsMatchStatus(g);
+        assertThat(g.getTotalPausedSeconds()).isZero();
+        assertThat(g.getSlaDueAt()).isEqualTo(dueBefore);
+    }
+
+    @Test
+    void rejectingFromACitizenHoldStillCreditsThePause() {
+        // Transition 11: the pause is credited on any exit from ON_HOLD, before
+        // REJECTED starts its own clock stop.
+        forceInProgress();
+        OffsetDateTime dueBefore = reload().getSlaDueAt();
+        hold(AWAITING_CITIZEN, CITIZEN, null, null);
+        backdatePause(2);
+
+        transition(REJECTED, admin, "citizen never responded");
+
+        Grievance g = reload();
+        assertHoldFieldsMatchStatus(g);
+        assertThat(g.getTotalPausedSeconds()).isBetween(7200L, 7260L);
+        assertThat(g.getSlaDueAt()).isEqualTo(dueBefore.plusSeconds(g.getTotalPausedSeconds()));
+        assertThat(g.getSlaPausedAt()).isNotNull();
     }
 }

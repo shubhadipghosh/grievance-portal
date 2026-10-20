@@ -23,6 +23,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -200,6 +201,9 @@ public class Grievance {
         if (target == GrievanceStatus.ASSIGNED) {
             throw new IllegalArgumentException("ASSIGNED needs an assignee; use applyAssignment");
         }
+        if (target == GrievanceStatus.ON_HOLD) {
+            throw new IllegalArgumentException("ON_HOLD needs hold details; use applyHold");
+        }
         moveTo(target, now);
     }
 
@@ -209,9 +213,39 @@ public class Grievance {
         moveTo(GrievanceStatus.ASSIGNED, now);
     }
 
+    /**
+     * ON_HOLD (transition 7). Owner validation is the caller's job; this sets the
+     * fields hold_fields_consistent requires, together with the status.
+     *
+     * @param holdOwner     null for EXTERNAL
+     * @param holdOwnerNote nullable
+     */
+    void applyHold(HoldReasonType reasonType, HoldOwnerType ownerType, AppUser holdOwner,
+                   String holdOwnerNote, OffsetDateTime now) {
+        holdReasonType = Objects.requireNonNull(reasonType, "reasonType");
+        holdOwnerType = Objects.requireNonNull(ownerType, "ownerType");
+        this.holdOwner = holdOwner;
+        this.holdOwnerNote = holdOwnerNote;
+        holdSince = Objects.requireNonNull(now, "now");
+        nextReviewAt = now.plusDays(7);
+        if (reasonType == HoldReasonType.AWAITING_CITIZEN) {
+            slaPausedAt = now;
+        }
+        moveTo(GrievanceStatus.ON_HOLD, now);
+    }
+
     private void moveTo(GrievanceStatus target, OffsetDateTime now) {
         Objects.requireNonNull(now, "now");
         if (status == GrievanceStatus.ON_HOLD) {
+            // Any exit from ON_HOLD (transitions 10 and 11). If the hold paused the
+            // clock, credit the pause before the target's own side effects run.
+            // Whole seconds for both, so the total and the extension agree exactly.
+            if (slaPausedAt != null) {
+                long paused = Duration.between(slaPausedAt, now).getSeconds();
+                totalPausedSeconds += paused;
+                slaDueAt = slaDueAt.plusSeconds(paused);
+                slaPausedAt = null;
+            }
             // hold_fields_consistent requires these null outside ON_HOLD.
             holdReasonType = null;
             holdOwnerType = null;
@@ -219,9 +253,6 @@ public class Grievance {
             holdOwnerNote = null;
             holdSince = null;
             nextReviewAt = null;
-            // TODO(SLA): if the hold paused the clock, add the paused duration to
-            //  totalPausedSeconds and extend slaDueAt by it. Not reachable until
-            //  the ON_HOLD method exists.
         }
         switch (target) {
             case RESOLVED -> {
@@ -254,9 +285,9 @@ public class Grievance {
                     // TODO(SLA): extend slaDueAt by the time spent RESOLVED.
                 }
             }
-            case ACKNOWLEDGED, ASSIGNED -> {
+            case ACKNOWLEDGED, ASSIGNED, ON_HOLD -> {
             }
-            case ON_HOLD, SUBMITTED ->
+            case SUBMITTED ->
                     throw new IllegalArgumentException("applyTransition does not handle " + target);
         }
         status = target;
