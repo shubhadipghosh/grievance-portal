@@ -42,3 +42,15 @@ management:
 logging:
   level:
     org.hibernate.SQL: debug
+
+app:
+  # Zone used for citizen-facing display formatting (ticket number
+  # year). Everything else runs in UTC.
+  display-zone: Asia/Kolkata
+
+grievance:
+  sla:
+    # Fraction of the category SLA granted when a grievance is
+    # reopened. Must be 0 < factor <= 1.0 — a reopen means the first
+    # resolution failed, so the window is shorter, never longer.
+    reopen-factor: 0.5

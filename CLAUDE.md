@@ -105,6 +105,14 @@ append-only, enforced by a database trigger. Never bypass it.
    - `AppUser.setStatus()` is public but now gates all authorization
      (suspension). Replace it with an audited suspend/reinstate operation
      behind its own permission.
+   - Delete the auth stub: `identity/internal/StubAuthSecurityConfig`
+     (`stub-auth` profile) and the `X-Actor-Id` header in
+     `GrievanceController`. Replace with the authenticated principal.
+   - Implement the `canView` gate (every `TODO(canView)` in the controllers).
+   - Low priority: `app.display-zone` has no test proving the property is
+     actually wired — a typo in the key silently falls back to the default
+     and nothing fails. Give it the same `ApplicationContextRunner`
+     treatment as `reopen-factor` when convenient.
 5. REST API: controllers, DTOs, pagination, OpenAPI
 6. Attachments → object storage
 7. SLA scheduler + escalation

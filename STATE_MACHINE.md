@@ -200,10 +200,24 @@ id exists. The defence belongs at the API layer, not in the service:
 1. **Visibility gate first.** Before calling the service, check `canView`:
    a citizen sees their own grievances; staff see grievances within their
    granted scope. Not visible → **404**, identical to a nonexistent id.
-2. **Past the gate**, map precisely: `IllegalTransitionException` → **409**,
-   `NotAuthorizedException` → **403**. Both are safe because the actor has
-   already shown they can see the grievance. Remaining mappings are set in
-   the REST API step.
+2. **Past the gate**, map precisely. Safe because the actor has already
+   shown they can see the grievance.
+
+All mappings live in `shared.ApiExceptionHandler`, as RFC 9457 ProblemDetail:
+
+| Exception | Status |
+|---|---|
+| `NotFoundException` | 404 |
+| `IllegalTransitionException` | 409 |
+| `ReopenLimitReachedException` | 409 |
+| `OptimisticLockingFailureException` (concurrent change) | 409 |
+| `NotAuthorizedException` | 403 |
+| `ReasonRequiredException` | 400 |
+| Bean Validation, unreadable body, missing/invalid header or param | 400 |
+| `IneligibleAssigneeException` | 422 |
+| `InvalidHoldDetailsException` | 422 |
+| `InvalidReferenceException` (unknown/inactive category or ward) | 422 |
+| anything else | 500, generic detail, logged; no message or stack trace |
 
 `canView` is not transition-specific: every read endpoint uses the same
 gate.
