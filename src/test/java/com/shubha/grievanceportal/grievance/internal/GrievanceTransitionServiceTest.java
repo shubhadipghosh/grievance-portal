@@ -5,10 +5,12 @@ import com.shubha.grievanceportal.grievance.GrievanceStatus;
 import com.shubha.grievanceportal.grievance.GrievanceTransitionService;
 import com.shubha.grievanceportal.identity.AppUser;
 import com.shubha.grievanceportal.identity.AuthorizationQuery;
+import com.shubha.grievanceportal.identity.UserStatus;
 import com.shubha.grievanceportal.organization.Category;
 import com.shubha.grievanceportal.organization.Department;
 import com.shubha.grievanceportal.organization.Ward;
 import com.shubha.grievanceportal.shared.IllegalTransitionException;
+import com.shubha.grievanceportal.shared.IneligibleAssigneeException;
 import com.shubha.grievanceportal.shared.NotAuthorizedException;
 import com.shubha.grievanceportal.shared.NotFoundException;
 import com.shubha.grievanceportal.shared.ReasonRequiredException;
@@ -62,10 +64,14 @@ class GrievanceTransitionServiceTest {
     GrievanceStatusHistoryRepository history;
 
     @Autowired
+    GrievanceAssignmentRepository assignments;
+
+    @Autowired
     GrievanceTransitionService service;
 
     Department sanitation;
     Ward w12;
+    Ward w7;
     AppUser citizen;
     AppUser admin;
     AppUser officer;
@@ -75,6 +81,7 @@ class GrievanceTransitionServiceTest {
     void fixtures() {
         sanitation = em.persist(new Department("SANITATION", "Sanitation"));
         w12 = em.persist(new Ward("W12", "Ward 12"));
+        w7 = em.persist(new Ward("W7", "Ward 7"));
         Category category = em.persist(new Category("GARBAGE", null, sanitation, 48));
         citizen = em.persist(AppUser.citizen("+919800000201", "Asha Das"));
         admin = em.persist(AppUser.staff("Sanitation Admin", null, "{bcrypt}x"));
@@ -83,23 +90,28 @@ class GrievanceTransitionServiceTest {
         grievance = grievances.save(new Grievance(ticketNo, citizen, category, w12, sanitation,
                 "Garbage not collected", "Three days now.", null, null, null,
                 OffsetDateTime.now().plusHours(48)));
-        grant(admin, "DEPT_ADMIN");
-        grant(officer, "FIELD_OFFICER");
+        grant(admin, "DEPT_ADMIN", null);
+        grant(officer, "FIELD_OFFICER", w12);
     }
 
-    void grant(AppUser user, String roleCode) {
+    // Always Sanitation; null ward = every ward.
+    void grant(AppUser user, String roleCode, Ward ward) {
         em.flush();
         em.getEntityManager().createNativeQuery("""
                         insert into user_role_grant (user_id, role_id, department_id, ward_id)
                         select ?1, r.id, ?2, ?3 from role r where r.code = ?4""")
                 .setParameter(1, user.getId())
                 .setParameter(2, sanitation.getId())
-                .setParameter(3, roleCode.equals("FIELD_OFFICER") ? w12.getId() : null)
+                .setParameter(3, ward == null ? null : ward.getId())
                 .setParameter(4, roleCode)
                 .executeUpdate();
     }
 
     // ASSIGNED is not reachable through the generic method, so tests start from IN_PROGRESS.
+    AppUser staff(String name) {
+        return em.persist(AppUser.staff(name, null, "{bcrypt}x"));
+    }
+
     void forceInProgress() {
         em.flush();
         em.getEntityManager()
@@ -112,6 +124,12 @@ class GrievanceTransitionServiceTest {
 
     void transition(GrievanceStatus target, AppUser actor, String reason) {
         service.transition(grievance.getId(), target, actor.getId(), reason);
+        em.flush();
+        em.clear();
+    }
+
+    void assign(AppUser assignee, AppUser actor) {
+        service.assign(grievance.getId(), assignee.getId(), actor.getId(), null);
         em.flush();
         em.clear();
     }
@@ -270,5 +288,107 @@ class GrievanceTransitionServiceTest {
         assertThat(g.getSlaPausedAt()).isNull();
         assertThat(g.getNudgeCount()).isZero();
         assertThat(g.getNextNudgeAt()).isNull();
+    }
+
+    // ---------------------------------------------------------------- assign
+
+    @Test
+    void assignFromAcknowledgedSetsAssigneeAndWritesBothRows() {
+        transition(ACKNOWLEDGED, admin, null);
+        assign(officer, admin);
+
+        Grievance g = reload();
+        assertThat(g.getStatus()).isEqualTo(ASSIGNED);
+        assertThat(g.getCurrentAssignee().getId()).isEqualTo(officer.getId());
+        assertThat(assignments.findByGrievanceIdOrderByAssignedAt(grievance.getId()))
+                .singleElement()
+                .satisfies(a -> {
+                    assertThat(a.getAssignee().getId()).isEqualTo(officer.getId());
+                    assertThat(a.getAssignedBy().getId()).isEqualTo(admin.getId());
+                    assertThat(a.isCurrent()).isTrue();
+                });
+        assertThat(history.findByGrievanceIdOrderByOccurredAt(grievance.getId()))
+                .last()
+                .satisfies(h -> {
+                    assertThat(h.getFromStatus()).isEqualTo(ACKNOWLEDGED);
+                    assertThat(h.getToStatus()).isEqualTo(ASSIGNED);
+                    assertThat(h.getActor().getId()).isEqualTo(admin.getId());
+                });
+    }
+
+    @Test
+    void assignFromReopenedEndsThePreviousAssignmentAndAgreesWithGrievance() {
+        AppUser second = staff("Mita Paul");
+        grant(second, "FIELD_OFFICER", w12);
+        transition(ACKNOWLEDGED, admin, null);
+        assign(officer, admin);
+        forceInProgress();
+        transition(RESOLVED, officer, "bins cleared");
+        transition(REOPENED, citizen, "still there");
+
+        assign(second, admin);
+
+        Grievance g = reload();
+        assertThat(g.getStatus()).isEqualTo(ASSIGNED);
+        var rows = assignments.findByGrievanceIdOrderByAssignedAt(grievance.getId());
+        assertThat(rows).hasSize(2);
+        assertThat(rows.get(0).isCurrent()).isFalse();
+        assertThat(rows).filteredOn(GrievanceAssignment::isCurrent)
+                .singleElement()
+                .satisfies(a -> assertThat(a.getAssignee().getId())
+                        .isEqualTo(g.getCurrentAssignee().getId())
+                        .isEqualTo(second.getId()));
+    }
+
+    @Test
+    void citizenAndSystemUserAreIneligibleAssignees() {
+        transition(ACKNOWLEDGED, admin, null);
+
+        for (UUID notStaff : new UUID[] {citizen.getId(), SystemActor.ID}) {
+            assertThatThrownBy(() -> service.assign(grievance.getId(), notStaff, admin.getId(), null))
+                    .isInstanceOf(IneligibleAssigneeException.class)
+                    .hasMessageContaining("not staff");
+        }
+        assertThat(reload().getStatus()).isEqualTo(ACKNOWLEDGED);
+    }
+
+    @Test
+    void suspendedStaffIsAnIneligibleAssignee() {
+        transition(ACKNOWLEDGED, admin, null);
+        em.find(AppUser.class, officer.getId()).setStatus(UserStatus.LOCKED);
+        em.flush();
+
+        assertThatThrownBy(() -> service.assign(grievance.getId(), officer.getId(), admin.getId(), null))
+                .isInstanceOf(IneligibleAssigneeException.class)
+                .hasMessageContaining("not active");
+    }
+
+    @Test
+    void staffWithoutWorkPermissionInScopeIsAnIneligibleAssignee() {
+        // Same department, other ward.
+        AppUser elsewhere = staff("Other Ward Officer");
+        grant(elsewhere, "FIELD_OFFICER", w7);
+        transition(ACKNOWLEDGED, admin, null);
+
+        assertThatThrownBy(() -> service.assign(grievance.getId(), elsewhere.getId(), admin.getId(), null))
+                .isInstanceOf(IneligibleAssigneeException.class)
+                .hasMessageContaining("GRIEVANCE_WORK");
+        assertThat(assignments.findByGrievanceIdOrderByAssignedAt(grievance.getId())).isEmpty();
+    }
+
+    @Test
+    void actorWithoutAssignPermissionIsNotAuthorized() {
+        // Field officers hold GRIEVANCE_WORK, not GRIEVANCE_ASSIGN.
+        transition(ACKNOWLEDGED, admin, null);
+
+        assertThatThrownBy(() -> service.assign(grievance.getId(), officer.getId(), officer.getId(), null))
+                .isInstanceOf(NotAuthorizedException.class);
+    }
+
+    @Test
+    void assignFromAStatusWithoutAnAssignTransitionIsIllegal() {
+        assertThatThrownBy(() -> service.assign(grievance.getId(), officer.getId(), admin.getId(), null))
+                .isInstanceOf(IllegalTransitionException.class)
+                .hasMessageContaining("SUBMITTED");
     }
 }

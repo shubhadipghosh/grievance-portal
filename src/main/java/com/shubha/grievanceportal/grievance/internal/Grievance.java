@@ -197,6 +197,19 @@ public class Grievance {
      */
     void applyTransition(GrievanceStatus target, OffsetDateTime now) {
         Objects.requireNonNull(target, "target");
+        if (target == GrievanceStatus.ASSIGNED) {
+            throw new IllegalArgumentException("ASSIGNED needs an assignee; use applyAssignment");
+        }
+        moveTo(target, now);
+    }
+
+    /** ASSIGNED (transitions 3, 17): sets the assignee and status together. */
+    void applyAssignment(AppUser assignee, OffsetDateTime now) {
+        currentAssignee = Objects.requireNonNull(assignee, "assignee");
+        moveTo(GrievanceStatus.ASSIGNED, now);
+    }
+
+    private void moveTo(GrievanceStatus target, OffsetDateTime now) {
         Objects.requireNonNull(now, "now");
         if (status == GrievanceStatus.ON_HOLD) {
             // hold_fields_consistent requires these null outside ON_HOLD.
@@ -241,9 +254,9 @@ public class Grievance {
                     // TODO(SLA): extend slaDueAt by the time spent RESOLVED.
                 }
             }
-            case ACKNOWLEDGED -> {
+            case ACKNOWLEDGED, ASSIGNED -> {
             }
-            case ON_HOLD, ASSIGNED, SUBMITTED ->
+            case ON_HOLD, SUBMITTED ->
                     throw new IllegalArgumentException("applyTransition does not handle " + target);
         }
         status = target;

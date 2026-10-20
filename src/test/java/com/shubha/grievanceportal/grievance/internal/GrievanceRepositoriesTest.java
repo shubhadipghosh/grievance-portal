@@ -204,7 +204,7 @@ class GrievanceRepositoriesTest {
         assertThat(Arrays.stream(Grievance.class.getDeclaredMethods())
                 .filter(m -> Modifier.isPublic(m.getModifiers()))
                 .map(Method::getName)
-                .filter(name -> name.startsWith("set") || name.equals("applyTransition")))
+                .filter(name -> name.startsWith("set") || name.startsWith("apply")))
                 .containsExactly("setPriority");
     }
 
