@@ -19,7 +19,9 @@ status rules live. No other code may set `grievance.status`.
 
 ## Transition table
 
-| # | From | To | Permission | Reason | Notes |
+Holding **any one** of the listed permissions authorises the transition.
+
+| # | From | To | Accepted permissions | Reason | Notes |
 |---|---|---|---|---|---|
 | 1 | SUBMITTED | ACKNOWLEDGED | GRIEVANCE_TRIAGE | no | May change category/department |
 | 2 | SUBMITTED | REJECTED | GRIEVANCE_REJECT | **yes** | Duplicate, out of scope, invalid |
@@ -32,11 +34,11 @@ status rules live. No other code may set `grievance.status`.
 | 9 | IN_PROGRESS | REJECTED | GRIEVANCE_REJECT | **yes** | Notifies all participants |
 | 10 | ON_HOLD | IN_PROGRESS | GRIEVANCE_HOLD | no | Dependency cleared |
 | 11 | ON_HOLD | REJECTED | GRIEVANCE_REJECT | **yes** | |
-| 12 | RESOLVED | CLOSED | CITIZEN_OWNER, GRIEVANCE_CLOSE_AUTO | no | Citizen confirms, or auto after nudge cycle |
-| 13 | RESOLVED | REOPENED | — (citizen, own grievance) | **yes** | Only if reopen_count = 0 |
+| 12 | RESOLVED | CLOSED | CITIZEN_OWNER, GRIEVANCE_CLOSE, GRIEVANCE_CLOSE_AUTO | no | Citizen confirms; staff close on their behalf; or SYSTEM auto-closes |
+| 13 | RESOLVED | REOPENED | CITIZEN_OWNER | **yes** | Only if reopen_count = 0 |
 | 14 | RESOLVED | IN_PROGRESS | GRIEVANCE_REVERT | **yes** | Staff error correction, dept admin+ |
-| 15 | REJECTED | CLOSED | CITIZEN_OWNER, GRIEVANCE_CLOSE_AUTO | no | Citizen acknowledges, or auto after nudge cycle |
-| 16 | REJECTED | REOPENED | — (citizen, own grievance) | **yes** | Dispute. Only if reopen_count = 0 |
+| 15 | REJECTED | CLOSED | CITIZEN_OWNER, GRIEVANCE_CLOSE, GRIEVANCE_CLOSE_AUTO | no | Citizen acknowledges; staff close on their behalf; or SYSTEM auto-closes |
+| 16 | REJECTED | REOPENED | CITIZEN_OWNER | **yes** | Dispute. Only if reopen_count = 0 |
 | 17 | REOPENED | ASSIGNED | GRIEVANCE_ASSIGN | no | Back into the normal cycle |
 | 18 | REOPENED | REJECTED | GRIEVANCE_REJECT | **yes** | |
 
@@ -44,6 +46,9 @@ status rules live. No other code may set `grievance.status`.
 
 Anything not in this table is illegal and must be rejected with a clear
 error naming both states.
+
+`CITIZEN_OWNER` is a sentinel, not a row in the permission table. It is
+satisfied by `grievance.citizen_id = actor.id`, never by a grant lookup.
 
 ## Non-transitions
 
@@ -54,7 +59,8 @@ tables, not `grievance_status_history`:
   `current_assignee_id`. Status unchanged.
 - **Comment** — row in `grievance_comment`.
 - **Attachment upload** — row in `attachment`.
-- **Nudge sent** — increments `nudge_count`, moves `next_nudge_at`.
+- **Nudge sent** — row in `grievance_nudge`, increments `nudge_count`,
+  moves `next_nudge_at`.
 
 ## Reopen rule
 
@@ -70,9 +76,12 @@ tables, not `grievance_status_history`:
 Applies to RESOLVED and REJECTED — any state awaiting citizen response.
 
 - Nudge at day 5, day 10, day 15 after entering the state.
+- Each nudge writes a `grievance_nudge` row: proof of contact if the
+  citizen later disputes the auto-close.
 - No response after the third nudge → auto-transition to CLOSED
-  (transitions 12 / 15, actor = system, recorded in history with
-  reason "auto-closed: no citizen response").
+  (transitions 12 / 15), actor = the SYSTEM user (`SystemActor.ID`,
+  holding GRIEVANCE_CLOSE_AUTO), recorded in history with reason
+  "auto-closed: no citizen response".
 - Citizen responding at any point (confirm, acknowledge, or reopen)
   cancels remaining nudges.
 
@@ -95,6 +104,9 @@ problem and the clock keeps running.
 Every 7 days while ON_HOLD, a status update goes to the citizen, the
 assignee, and the department admin, and `next_review_at` moves forward.
 
+The `hold_fields_consistent` CHECK makes it impossible to be ON_HOLD
+without recording `hold_reason_type`, `hold_owner_type` and `hold_since`.
+
 ## Permissions
 
 | Code | Held by |
@@ -105,16 +117,36 @@ assignee, and the department admin, and `next_review_at` moves forward.
 | GRIEVANCE_HOLD | dept admin, super admin |
 | GRIEVANCE_REJECT | dept admin, super admin |
 | GRIEVANCE_REVERT | dept admin, super admin |
-| GRIEVANCE_VIEW_INTERNAL | all staff |
-| GRIEVANCE_COMMENT | all staff |
 | GRIEVANCE_CLOSE | dept admin, super admin |
-| GRIEVANCE_CLOSE_AUTO | SYSTEM user only |
+| GRIEVANCE_CLOSE_AUTO | SYSTEM only |
+| GRIEVANCE_VIEW_INTERNAL | all staff, auditor |
+| GRIEVANCE_COMMENT | all staff |
 
-Field officers deliberately cannot reject, hold, or revert. Those are
-decisions with accountability attached and belong to someone supervising.
+Field officers deliberately cannot reject, hold, revert, or close. Those
+are decisions with accountability attached and belong to someone
+supervising.
+
+`GRIEVANCE_CLOSE` and `GRIEVANCE_CLOSE_AUTO` are separate on purpose. A
+human closing a grievance and the scheduler closing it after three
+ignored nudges reach the same state by different routes, and the audit
+trail must distinguish them. The SYSTEM role holds only
+GRIEVANCE_CLOSE_AUTO — it can do exactly one thing and nothing else.
 
 Citizen actions (confirm, acknowledge, reopen) are not permission-based.
 They are authorised by ownership: `grievance.citizen_id = actor.id`.
+
+## The SYSTEM actor
+
+Automated transitions go through the same authorization path as everyone
+else. There is no bypass.
+
+- One seeded `app_user` row, `user_type = 'SYSTEM'`, fixed id
+  `00000000-0000-0000-0000-000000000001`, exposed as `SystemActor.ID`.
+- Holds the SYSTEM role, unscoped (department and ward both NULL), whose
+  only permission is GRIEVANCE_CLOSE_AUTO.
+- `uq_single_system_user` guarantees there is at most one.
+- `grievance_status_history.actor_id` is NOT NULL: every status change in
+  the system is attributable to a real user row.
 
 ## Service contract
 
@@ -131,8 +163,9 @@ Order of operations, all inside one transaction:
 
 1. Load grievance (optimistic lock via @Version)
 2. Look up (current, target) in the transition table — unknown pair rejects
-3. Authorise: permission scoped to grievance's department + ward,
-   or citizen ownership for citizen transitions
+3. Authorise: actor holds one of the accepted permissions, scoped to the
+   grievance's department and ward; or CITIZEN_OWNER is accepted and the
+   actor owns the grievance
 4. Validate reason present if required
 5. Guard reopen_count for transitions 13 and 16
 6. Apply side effects (see below)
@@ -148,8 +181,38 @@ Order of operations, all inside one transaction:
 | REJECTED | sla_paused_at, nudge_count=0, next_nudge_at=+5d |
 | CLOSED | closed_at, next_nudge_at=NULL |
 | ON_HOLD | hold_since, hold_reason_type, hold_owner, next_review_at=+7d; sla_paused_at if AWAITING_CITIZEN |
-| IN_PROGRESS (from ON_HOLD) | clears hold_*, resumes SLA by extending sla_due_at by paused duration |
+| IN_PROGRESS (from ON_HOLD) | clears hold_*, adds paused duration to total_paused_seconds, extends sla_due_at by the same |
 | REOPENED | reopen_count=1, resolved_at=NULL, clears sla_paused_at, recomputes sla_due_at |
+
+## Authorization scoping
+
+A grant with NULL on an axis is unrestricted on that axis.
+
+```sql
+SELECT EXISTS (
+  SELECT 1
+  FROM user_role_grant g
+         JOIN role_permission rp ON rp.role_id = g.role_id
+         JOIN app_user u        ON u.id = g.user_id
+  WHERE g.user_id = :actorId
+    AND u.status = 'ACTIVE'
+    AND g.revoked_at IS NULL
+    AND rp.permission_code IN (:codes)
+    AND (g.department_id IS NULL OR g.department_id = :departmentId)
+    AND (g.ward_id       IS NULL OR g.ward_id       = :wardId)
+)
+```
+
+| Grant scope | Authorised on |
+|---|---|
+| (NULL, NULL) | every grievance — super admin, SYSTEM |
+| (Sanitation, NULL) | every Sanitation grievance, any ward |
+| (Sanitation, Ward 12) | Sanitation grievances in Ward 12 only |
+
+A revoked grant (`revoked_at IS NOT NULL`) never authorises.
+A user whose `app_user.status` is not ACTIVE (LOCKED or DISABLED) is
+rejected on **both** paths, including citizen ownership. Suspension gates
+everything; it is reversible, so grants are left intact rather than revoked.
 
 ## Implementation note
 
