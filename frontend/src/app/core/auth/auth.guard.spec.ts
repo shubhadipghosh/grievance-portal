@@ -2,7 +2,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { CanActivateFn, provideRouter, Router, UrlTree } from '@angular/router';
-import { authGuard, staffGuard } from './auth.guard';
+import { authGuard, citizenGuard, staffGuard } from './auth.guard';
 
 describe('auth guards', () => {
   let backend: HttpTestingController;
@@ -50,5 +50,17 @@ describe('auth guards', () => {
 
   it('staffGuard: allows staff', async () => {
     expect(await run(staffGuard, staff)).toBe(true);
+  });
+
+  it('citizenGuard: redirects without a session to the OTP login', async () => {
+    expect(await run(citizenGuard, null)).toBe('/citizen/login');
+  });
+
+  it('citizenGuard: redirects a staff session', async () => {
+    expect(await run(citizenGuard, staff)).toBe('/citizen/login');
+  });
+
+  it('citizenGuard: allows a citizen', async () => {
+    expect(await run(citizenGuard, citizen)).toBe(true);
   });
 });

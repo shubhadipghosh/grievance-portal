@@ -11,7 +11,10 @@ public record GrievanceSummary(
         Priority priority,
         UUID departmentId,
         UUID wardId,
+        String wardName,
         String title,
         UUID currentAssigneeId,
-        OffsetDateTime slaDueAt) {
+        String assigneeName,
+        OffsetDateTime slaDueAt,
+        OffsetDateTime resolvedAt) {
 }

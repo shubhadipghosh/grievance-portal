@@ -21,11 +21,14 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 import static com.shubha.grievanceportal.CsrfTokens.csrfToken;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -193,6 +196,31 @@ class GrievanceApiTest {
     }
 
     @Test
+    void queueRowsCarryWardAndAssigneeNames() throws Exception {
+        String unassigned = file();
+        String assigned = file();
+        act("acknowledge", unassigned, admin, null).andExpect(status().isOk());
+        act("acknowledge", assigned, admin, null).andExpect(status().isOk());
+        act("assign", assigned, admin, "{\"assigneeId\": \"%s\"}".formatted(officer.getId()))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/grievances").with(as(admin))
+                        .param("departmentId", sanitation.getId().toString())
+                        .param("status", "ASSIGNED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(assigned))
+                .andExpect(jsonPath("$.content[0].wardName").value("Ward 12"))
+                .andExpect(jsonPath("$.content[0].assigneeName").value("Ravi Sen"));
+        mvc.perform(get("/api/v1/grievances").with(as(admin))
+                        .param("departmentId", sanitation.getId().toString())
+                        .param("status", "ACKNOWLEDGED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(unassigned))
+                .andExpect(jsonPath("$.content[0].wardName").value("Ward 12"))
+                .andExpect(jsonPath("$.content[0].assigneeName").value(nullValue()));
+    }
+
+    @Test
     void acknowledge() throws Exception {
         act("acknowledge", file(), admin, null)
                 .andExpect(status().isOk())
@@ -233,6 +261,33 @@ class GrievanceApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RESOLVED"))
                 .andExpect(jsonPath("$.resolvedAt").exists());
+    }
+
+    @Test
+    void queueRowsCarryResolvedAtOnlyOnceResolved() throws Exception {
+        String resolved = file();
+        String working = file();
+        forceInProgress(resolved);
+        forceInProgress(working);
+        String body = act("resolve", resolved, officer, "{\"reason\": \"bins cleared\"}")
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        Instant resolvedAt = Instant.parse(JsonPath.read(body, "$.resolvedAt"));
+
+        String queue = mvc.perform(get("/api/v1/grievances").with(as(admin))
+                        .param("departmentId", sanitation.getId().toString())
+                        .param("status", "RESOLVED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(resolved))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(Instant.parse(JsonPath.read(queue, "$.content[0].resolvedAt"))).isEqualTo(resolvedAt);
+
+        mvc.perform(get("/api/v1/grievances").with(as(admin))
+                        .param("departmentId", sanitation.getId().toString())
+                        .param("status", "IN_PROGRESS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(working))
+                .andExpect(jsonPath("$.content[0].resolvedAt").value(nullValue()));
     }
 
     @Test

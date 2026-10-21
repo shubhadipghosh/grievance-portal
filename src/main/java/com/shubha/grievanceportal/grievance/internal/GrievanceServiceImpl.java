@@ -120,8 +120,10 @@ class GrievanceServiceImpl implements GrievanceService {
 
     private static GrievanceSummary summary(Grievance g) {
         return new GrievanceSummary(g.getId(), g.getTicketNo(), g.getStatus(), g.getPriority(),
-                g.getDepartment().getId(), g.getWard().getId(), g.getTitle(),
-                idOf(g.getCurrentAssignee()), g.getSlaDueAt());
+                g.getDepartment().getId(), g.getWard().getId(), g.getWard().getName(), g.getTitle(),
+                idOf(g.getCurrentAssignee()),
+                g.getCurrentAssignee() == null ? null : g.getCurrentAssignee().getFullName(),
+                g.getSlaDueAt(), g.getResolvedAt());
     }
 
     private static UUID idOf(AppUser user) {

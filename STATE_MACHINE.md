@@ -279,6 +279,20 @@ Why not the alternatives:
   failed, there is less time than originally, and the clock is visibly
   running.
 
+### Resolved late
+
+The queue marks a grievance "Resolved late" when `resolved_at` is after
+`sla_due_at`. Both columns describe only the current cycle:
+
+- REOPENED clears `resolved_at` and replaces `sla_due_at` with the reopen
+  window, so after a reopen the marker compares the most recent resolution
+  against the reopen window, not the original breach.
+- A staff revert (RESOLVED → IN_PROGRESS) also clears `resolved_at`.
+
+A breach in an earlier cycle is therefore not visible on the grievance row.
+The full history stays in `grievance_status_history`; breach reporting
+reads it from there.
+
 ### Why three methods, not one
 
 `transition(grievanceId, target, actorId, reason)` handles every target

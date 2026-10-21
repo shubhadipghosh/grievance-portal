@@ -143,6 +143,21 @@ class GrievanceRepositoriesTest {
                 .containsExactly(second, first);
     }
 
+    /** The queue shows ward and assignee names; loading them lazily would be a query per row. */
+    @Test
+    void departmentQueueFetchesWardAndAssigneeInItsOwnQuery() {
+        Grievance g = newGrievance(OffsetDateTime.now().plusHours(5));
+        setStatus(g, GrievanceStatus.IN_PROGRESS);
+
+        assertThat(grievances.findOpenVisibleByDepartmentAndStatus(null, true, Set.of(), dept.getId(),
+                GrievanceStatus.IN_PROGRESS, PageRequest.of(0, 10)))
+                .singleElement()
+                .satisfies(loaded -> {
+                    assertThat(Hibernate.isInitialized(loaded.getWard())).isTrue();
+                    assertThat(Hibernate.isInitialized(loaded.getCurrentAssignee())).isTrue();
+                });
+    }
+
     @Test
     void openQueueFindersExcludeTerminalStatuses() {
         OffsetDateTime now = OffsetDateTime.now();

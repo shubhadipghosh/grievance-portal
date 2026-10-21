@@ -51,4 +51,15 @@ public interface UserRoleGrantRepository extends JpaRepository<UserRoleGrant, UU
               and rp.permission_code = :code
             """, nativeQuery = true)
     List<ScopeRow> findScopesWithPermission(@Param("userId") UUID userId, @Param("code") String code);
+
+    // Same conditions again, for any permission at all.
+    @Query(value = """
+            select distinct g.department_id as departmentId, g.ward_id as wardId
+            from user_role_grant g
+            join app_user u on u.id = g.user_id
+            where g.user_id = :userId
+              and u.status = 'ACTIVE'
+              and g.revoked_at is null
+            """, nativeQuery = true)
+    List<ScopeRow> findActiveScopes(@Param("userId") UUID userId);
 }

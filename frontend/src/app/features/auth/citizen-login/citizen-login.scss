@@ -1,0 +1,84 @@
+main {
+  max-width: 24rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.phone {
+  display: flex;
+}
+
+.prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  border: 1px solid #767676;
+  border-right: 0;
+  background: #f2f2f2;
+}
+
+.phone input {
+  flex: 1;
+  min-width: 0;
+}
+
+input,
+button {
+  font: inherit;
+  padding: 0.75rem;
+}
+
+#code {
+  letter-spacing: 0.3em;
+}
+
+button[type='submit'] {
+  width: 100%;
+}
+
+.secondary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+// Text buttons, but still a 48px touch target.
+.link {
+  min-height: 48px;
+  background: none;
+  border: 0;
+  color: #0b57d0;
+  text-decoration: underline;
+}
+
+.link:disabled {
+  color: #595959;
+  text-decoration: none;
+}
+
+.hint {
+  color: #595959;
+  margin: 0;
+}
+
+.notice {
+  margin: 0 0 0.75rem;
+}
+
+.notice:empty {
+  display: none;
+}
+
+.field-error,
+.form-error {
+  color: #b00020;
+  margin: 0;
+}

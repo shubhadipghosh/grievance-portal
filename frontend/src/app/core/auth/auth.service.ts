@@ -1,7 +1,12 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Service, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { CurrentUser, StaffLoginRequest } from '../api/api.types';
+import {
+  CurrentUser,
+  OtpSendRequest,
+  OtpVerifyRequest,
+  StaffLoginRequest,
+} from '../api/api.types';
 
 @Service()
 export class AuthService {
@@ -27,6 +32,23 @@ export class AuthService {
     await this.restoreSession();
     const user = await firstValueFrom(
       this.http.post<CurrentUser>('/api/v1/auth/staff/login', credentials),
+    );
+    this.user.set(user);
+    return user;
+  }
+
+  /** Texts a login code. Rejects with 400 for an invalid phone, 429 when rate limited. */
+  async sendOtp(request: OtpSendRequest): Promise<void> {
+    // Same CSRF wait as login().
+    await this.restoreSession();
+    await firstValueFrom(this.http.post<void>('/api/v1/auth/otp/send', request));
+  }
+
+  /** Rejects with 401 for any failure; the backend never says why. */
+  async verifyOtp(request: OtpVerifyRequest): Promise<CurrentUser> {
+    await this.restoreSession();
+    const user = await firstValueFrom(
+      this.http.post<CurrentUser>('/api/v1/auth/otp/verify', request),
     );
     this.user.set(user);
     return user;

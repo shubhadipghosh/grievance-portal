@@ -35,9 +35,12 @@ public interface GrievanceRepository extends JpaRepository<Grievance, UUID> {
      * Department queue filtered by one open status, limited to what the actor
      * can view (GrievanceAuthorization.canView): the visible wards, plus the
      * actor's own grievances if they are an ACTIVE citizen. idx_grv_dept_open.
+     * Fetches ward and assignee in the same query: each row shows their names.
      */
     @Query("""
             select g from Grievance g
+            join fetch g.ward
+            left join fetch g.currentAssignee
             where g.department.id = :departmentId
               and g.status = :status
               and g.status not in (

@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { email, form, FormField, required, submit } from '@angular/forms/signals';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
+import { tooManyAttemptsMessage } from '../../../core/auth/rate-limit';
 
 @Component({
   selector: 'app-staff-login',
@@ -42,19 +43,8 @@ function errorMessage(e: unknown): string {
       return 'Incorrect email or password.';
     }
     if (e.status === 429) {
-      const seconds = Number(e.headers.get('Retry-After'));
-      return seconds > 0
-        ? `Too many attempts. Try again in ${formatWait(seconds)}.`
-        : 'Too many attempts. Try again later.';
+      return tooManyAttemptsMessage(e);
     }
   }
   return 'Something went wrong. Please try again.';
-}
-
-function formatWait(seconds: number): string {
-  if (seconds < 60) {
-    return seconds === 1 ? '1 second' : `${seconds} seconds`;
-  }
-  const minutes = Math.ceil(seconds / 60);
-  return minutes === 1 ? '1 minute' : `${minutes} minutes`;
 }
