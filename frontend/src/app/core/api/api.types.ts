@@ -108,6 +108,35 @@ export interface GrievanceDetails {
   holdSince: string | null;
 }
 
+/** grievance.CitizenGrievanceSummary: a row in the citizen's own list. No staff detail. */
+export interface CitizenGrievanceSummary {
+  id: string;
+  ticketNo: string;
+  status: GrievanceStatus;
+  title: string;
+  wardName: string;
+  submittedAt: string;
+  /** Null unless resolved. Cleared on reopen and on revert. */
+  resolvedAt: string | null;
+}
+
+/**
+ * grievance.internal.HistoryEntry: one status change. In the citizen view
+ * actorName is always null, and reason is withheld except where it was
+ * written for the citizen (STATE_MACHINE.md, "What citizens see").
+ */
+export interface HistoryEntry {
+  /** Null on the initial SUBMITTED entry. */
+  fromStatus: GrievanceStatus | null;
+  toStatus: GrievanceStatus;
+  occurredAt: string;
+  actorType: UserType;
+  actorName: string | null;
+  reason: string | null;
+  /** Set only on ON_HOLD entries. */
+  holdReasonType: HoldReasonType | null;
+}
+
 /** organization.DepartmentSummary */
 export interface DepartmentSummary {
   id: string;

@@ -3,6 +3,7 @@ package com.shubha.grievanceportal.grievance;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Filing and reading grievances. Status changes go through {@link GrievanceTransitionService}. */
@@ -29,4 +30,14 @@ public interface GrievanceService {
      * actor can see.
      */
     Page<GrievanceSummary> queue(UUID actorId, UUID departmentId, GrievanceStatus status, Pageable pageable);
+
+    /** Grievances the citizen filed, newest first. Any sort on the pageable is ignored. */
+    Page<CitizenGrievanceSummary> mine(UUID citizenId, Pageable pageable);
+
+    /**
+     * Every status change, oldest first, unfiltered.
+     *
+     * @throws com.shubha.grievanceportal.shared.NotFoundException no such grievance
+     */
+    List<StatusChange> history(UUID grievanceId);
 }

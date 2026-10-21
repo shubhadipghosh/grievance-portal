@@ -31,6 +31,16 @@ class GrievanceViewGate {
                 .orElseThrow(() -> new NotFoundException("Grievance", grievanceId));
     }
 
+    /**
+     * Whether the actor sees the grievance's internal detail (staff names,
+     * internal reasons). Call after {@link #requireVisible}.
+     */
+    boolean seesInternal(UUID actorId, UUID grievanceId) {
+        return grievances.findById(grievanceId)
+                .filter(g -> authorization.canViewInternal(actorId, g))
+                .isPresent();
+    }
+
     /** @throws NotFoundException no such ticket, or the actor cannot view it */
     void requireVisibleByTicketNo(UUID actorId, String ticketNo) {
         grievances.findByTicketNo(ticketNo)

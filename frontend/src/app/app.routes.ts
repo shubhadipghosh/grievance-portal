@@ -26,6 +26,14 @@ export const routes: Routes = [
       import('./features/citizen/file-grievance/file-grievance').then((m) => m.FileGrievance),
   },
   {
+    path: 'citizen/grievances/:id',
+    canActivate: [citizenGuard],
+    loadComponent: () =>
+      import('./features/citizen/citizen-grievance/citizen-grievance').then(
+        (m) => m.CitizenGrievance,
+      ),
+  },
+  {
     path: 'queue',
     canActivate: [staffGuard],
     loadComponent: () => import('./features/queue/queue').then((m) => m.Queue),

@@ -8,19 +8,8 @@ import {
   PagedModel,
 } from '../../core/api/api.types';
 import { GrievanceService } from '../../core/api/grievance.service';
+import { STATUS_LABELS } from '../../core/api/labels';
 import { ReferenceDataService } from '../../core/api/reference-data.service';
-
-const STATUS_LABELS: Record<GrievanceStatus, string> = {
-  SUBMITTED: 'Submitted',
-  ACKNOWLEDGED: 'Acknowledged',
-  ASSIGNED: 'Assigned',
-  IN_PROGRESS: 'In progress',
-  ON_HOLD: 'On hold',
-  RESOLVED: 'Resolved',
-  CLOSED: 'Closed',
-  REJECTED: 'Rejected',
-  REOPENED: 'Reopened',
-};
 
 // Statuses whose SLA clock is running. On hold, slaDueAt is stale until the
 // hold ends and extends it; resolved, closed and rejected have stopped.

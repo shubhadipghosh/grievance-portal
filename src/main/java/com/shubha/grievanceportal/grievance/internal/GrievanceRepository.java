@@ -28,8 +28,19 @@ public interface GrievanceRepository extends JpaRepository<Grievance, UUID> {
     @Query(value = "select nextval('grievance_ticket_seq')", nativeQuery = true)
     long nextTicketSequence();
 
-    /** Citizen "my grievances" page; idx_grv_citizen. */
-    Page<Grievance> findByCitizenIdOrderBySubmittedAtDesc(UUID citizenId, Pageable pageable);
+    /**
+     * Citizen "my grievances" page; idx_grv_citizen. Fetches the ward: each row
+     * shows its name. Ties on submittedAt (one transaction) fall back to the
+     * id, which is UUIDv7 and so also newest first.
+     */
+    @Query(value = """
+            select g from Grievance g
+            join fetch g.ward
+            where g.citizen.id = :citizenId
+            order by g.submittedAt desc, g.id desc
+            """,
+            countQuery = "select count(g) from Grievance g where g.citizen.id = :citizenId")
+    Page<Grievance> findByCitizenIdOrderBySubmittedAtDesc(@Param("citizenId") UUID citizenId, Pageable pageable);
 
     /**
      * Department queue filtered by one open status, limited to what the actor

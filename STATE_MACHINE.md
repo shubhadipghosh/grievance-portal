@@ -370,6 +370,40 @@ A user whose `app_user.status` is not ACTIVE (LOCKED or DISABLED) is
 rejected on **both** paths, including citizen ownership. Suspension gates
 everything; it is reversible, so grants are left intact rather than revoked.
 
+## What citizens see
+
+`GET /api/v1/grievances/{id}/history` returns the full history only to an
+actor holding `GRIEVANCE_VIEW_INTERNAL` with scope covering the grievance
+(all staff roles, auditor). Everyone else, which in practice means the
+citizen who filed it, gets the redacted view. It fails closed: anyone the
+permission check does not clear is treated as a citizen. Both rules live
+in `HistoryEntry.forCitizen`, and `GrievanceHistoryApiTest` fails if
+either is loosened.
+
+**Rule 1: officers are never named to citizens.** The citizen view
+carries the actor's type only (CITIZEN, STAFF, SYSTEM), and the UI shows
+"You", "Municipal staff", "System". `actorName` is always null. This is a
+safety decision as much as a privacy one: municipal officers have been
+harassed over complaint decisions. Reversing it is the stakeholder's
+call, not an engineering one.
+
+**Rule 2: staff free text is shown to citizens only where it is written
+for them.**
+
+| Entry | Citizen sees the reason? |
+|---|---|
+| RESOLVED | yes (the resolution note, transition 8) |
+| REJECTED | yes |
+| REOPENED, CLOSED | only if the citizen wrote it themselves |
+| ON_HOLD | never; the hold category (`hold_reason_type`) instead |
+| anything else | no |
+
+Hold text often names contractors or records internal frustrations, so
+for ON_HOLD the citizen gets the category ("Awaiting contractor") and
+never the text. The category is recorded on the history row itself
+(V10): `grievance.hold_reason_type` is cleared when the hold ends. Holds
+recorded before V10 have no category on their row.
+
 ## Implementation note
 
 `Grievance.setStatus()` must NOT be public. The entity exposes only a

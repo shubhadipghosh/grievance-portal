@@ -1,0 +1,110 @@
+main {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.75rem;
+}
+
+h1 {
+  margin-bottom: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+h2 {
+  font-size: 1.125rem;
+}
+
+.ticket {
+  font-family: monospace;
+  margin: 0 0 1rem;
+  user-select: all;
+}
+
+// Label above value: no columns to squeeze on a narrow screen.
+.facts {
+  margin: 0 0 1rem;
+}
+
+.facts div + div {
+  margin-top: 0.5rem;
+}
+
+.facts dt {
+  color: #595959;
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.status {
+  font-weight: bold;
+}
+
+.resolution {
+  border-left: 4px solid #1e7d32;
+  padding: 0 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.resolution p {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+// A vertical timeline: one entry per change, read top to bottom, newest first.
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1.25rem;
+  border-left: 2px solid #767676;
+}
+
+.timeline li {
+  position: relative;
+  padding-bottom: 1rem;
+}
+
+.timeline li::before {
+  content: '';
+  position: absolute;
+  left: calc(-1.25rem - 6px);
+  top: 0.35rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #0b57d0;
+}
+
+// The current state.
+.timeline li:first-child::before {
+  background: #0b57d0;
+}
+
+.timeline p {
+  margin: 0;
+}
+
+.what {
+  font-weight: bold;
+}
+
+.when {
+  color: #595959;
+}
+
+.note {
+  margin-top: 0.25rem;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.form-error {
+  color: #b00020;
+  margin: 0;
+}

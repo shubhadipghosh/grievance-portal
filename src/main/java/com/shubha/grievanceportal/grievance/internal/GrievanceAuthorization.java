@@ -22,6 +22,7 @@ import static com.shubha.grievanceportal.grievance.internal.GrievanceTransitions
 class GrievanceAuthorization {
 
     static final String VIEW = "GRIEVANCE_VIEW";
+    static final String VIEW_INTERNAL = "GRIEVANCE_VIEW_INTERNAL";
 
     /**
      * Wards of one department whose grievances an actor sees through
@@ -57,6 +58,11 @@ class GrievanceAuthorization {
     /** The ACTIVE citizen who filed it, or GRIEVANCE_VIEW with scope covering it. */
     boolean canView(UUID actorId, Grievance grievance) {
         return isAuthorized(actorId, grievance, Set.of(CITIZEN_OWNER, VIEW));
+    }
+
+    /** GRIEVANCE_VIEW_INTERNAL with scope covering it: unredacted history. Citizens never hold it. */
+    boolean canViewInternal(UUID actorId, Grievance grievance) {
+        return isAuthorized(actorId, grievance, Set.of(VIEW_INTERNAL));
     }
 
     /** {@link #canView} for a whole department at once, so a list can be filtered in its query. */

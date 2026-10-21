@@ -1,5 +1,6 @@
 package com.shubha.grievanceportal.grievance.internal;
 
+import com.shubha.grievanceportal.grievance.CitizenGrievanceSummary;
 import com.shubha.grievanceportal.grievance.GrievanceDetails;
 import com.shubha.grievanceportal.grievance.GrievanceService;
 import com.shubha.grievanceportal.grievance.GrievanceStatus;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -88,6 +90,23 @@ class GrievanceController {
                                        @RequestParam GrievanceStatus status,
                                        @PageableDefault(size = 20) Pageable pageable) {
         return new PagedModel<>(grievances.queue(actor.id(), departmentId, status, pageable));
+    }
+
+    /** The caller's own grievances, newest first. */
+    @GetMapping("/mine")
+    PagedModel<CitizenGrievanceSummary> mine(@AuthenticationPrincipal CurrentUser actor,
+                                             @PageableDefault(size = 20) Pageable pageable) {
+        return new PagedModel<>(grievances.mine(actor.id(), pageable));
+    }
+
+    /** Oldest first. Redacted unless the actor holds GRIEVANCE_VIEW_INTERNAL over it: see HistoryEntry. */
+    @GetMapping("/{id}/history")
+    List<HistoryEntry> history(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id) {
+        viewGate.requireVisible(actor.id(), id);
+        boolean internal = viewGate.seesInternal(actor.id(), id);
+        return grievances.history(id).stream()
+                .map(c -> internal ? HistoryEntry.full(c) : HistoryEntry.forCitizen(c, actor.id()))
+                .toList();
     }
 
     @PostMapping("/{id}/acknowledge")

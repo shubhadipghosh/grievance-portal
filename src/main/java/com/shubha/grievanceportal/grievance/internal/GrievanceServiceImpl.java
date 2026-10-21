@@ -1,10 +1,12 @@
 package com.shubha.grievanceportal.grievance.internal;
 
+import com.shubha.grievanceportal.grievance.CitizenGrievanceSummary;
 import com.shubha.grievanceportal.grievance.GrievanceDetails;
 import com.shubha.grievanceportal.grievance.GrievanceService;
 import com.shubha.grievanceportal.grievance.GrievanceStatus;
 import com.shubha.grievanceportal.grievance.GrievanceSummary;
 import com.shubha.grievanceportal.grievance.NewGrievance;
+import com.shubha.grievanceportal.grievance.StatusChange;
 import com.shubha.grievanceportal.identity.AppUser;
 import com.shubha.grievanceportal.identity.UserStatus;
 import com.shubha.grievanceportal.identity.UserType;
@@ -24,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -118,6 +121,27 @@ class GrievanceServiceImpl implements GrievanceService {
         return grievances.findOpenVisibleByDepartmentAndStatus(actorId, visible.all(), visible.wardIds(),
                         departmentId, status, unsorted)
                 .map(GrievanceServiceImpl::summary);
+    }
+
+    @Override
+    public Page<CitizenGrievanceSummary> mine(UUID citizenId, Pageable pageable) {
+        Objects.requireNonNull(citizenId, "citizenId");
+        Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        return grievances.findByCitizenIdOrderBySubmittedAtDesc(citizenId, unsorted)
+                .map(g -> new CitizenGrievanceSummary(g.getId(), g.getTicketNo(), g.getStatus(), g.getTitle(),
+                        g.getWard().getName(), g.getSubmittedAt(), g.getResolvedAt()));
+    }
+
+    @Override
+    public List<StatusChange> history(UUID grievanceId) {
+        if (!grievances.existsById(grievanceId)) {
+            throw new NotFoundException("Grievance", grievanceId);
+        }
+        return history.findWithActorsByGrievanceId(grievanceId).stream()
+                .map(h -> new StatusChange(h.getFromStatus(), h.getToStatus(), h.getOccurredAt(),
+                        h.getActor().getId(), h.getActor().getUserType(), h.getActor().getFullName(),
+                        h.getReason(), h.getHoldReasonType()))
+                .toList();
     }
 
     private static GrievanceDetails details(Grievance g) {

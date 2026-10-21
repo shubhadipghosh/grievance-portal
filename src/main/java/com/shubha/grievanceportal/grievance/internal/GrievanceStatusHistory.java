@@ -1,6 +1,7 @@
 package com.shubha.grievanceportal.grievance.internal;
 
 import com.shubha.grievanceportal.grievance.GrievanceStatus;
+import com.shubha.grievanceportal.grievance.HoldReasonType;
 import com.shubha.grievanceportal.identity.AppUser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -56,6 +57,11 @@ public class GrievanceStatusHistory {
     @Column(name = "reason", length = 1000, updatable = false)
     private String reason;
 
+    // Set only on ON_HOLD rows (from V10 on): the grievance's own copy is cleared when the hold ends.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "hold_reason_type", length = 30, updatable = false)
+    private HoldReasonType holdReasonType;
+
     // DB default now(); null on a freshly persisted instance until reloaded.
     @Column(name = "occurred_at", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime occurredAt;
@@ -69,11 +75,21 @@ public class GrievanceStatusHistory {
      */
     public GrievanceStatusHistory(Grievance grievance, GrievanceStatus fromStatus, GrievanceStatus toStatus,
                                   AppUser actor, String reason) {
+        this(grievance, fromStatus, toStatus, actor, reason, null);
+    }
+
+    /** @param holdReasonType required when toStatus is ON_HOLD, otherwise null */
+    public GrievanceStatusHistory(Grievance grievance, GrievanceStatus fromStatus, GrievanceStatus toStatus,
+                                  AppUser actor, String reason, HoldReasonType holdReasonType) {
         this.grievance = Objects.requireNonNull(grievance, "grievance");
         this.fromStatus = fromStatus;
         this.toStatus = Objects.requireNonNull(toStatus, "toStatus");
         this.actor = Objects.requireNonNull(actor, "actor");
         this.reason = reason;
+        if ((toStatus == GrievanceStatus.ON_HOLD) != (holdReasonType != null)) {
+            throw new IllegalArgumentException("holdReasonType is required on, and only on, an ON_HOLD row");
+        }
+        this.holdReasonType = holdReasonType;
     }
 
     public UUID getId() {
@@ -98,6 +114,10 @@ public class GrievanceStatusHistory {
 
     public String getReason() {
         return reason;
+    }
+
+    public HoldReasonType getHoldReasonType() {
+        return holdReasonType;
     }
 
     public OffsetDateTime getOccurredAt() {

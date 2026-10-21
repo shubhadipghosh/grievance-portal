@@ -75,7 +75,7 @@ class GrievanceTransitionServiceImpl implements GrievanceTransitionService {
             grievance.applyTransition(target, now);
         }
 
-        recordAndSave(grievance, from, target, actorId, reason);
+        recordAndSave(grievance, from, target, actorId, reason, null);
     }
 
     @Override
@@ -99,7 +99,7 @@ class GrievanceTransitionServiceImpl implements GrievanceTransitionService {
         AppUser actor = entityManager.getReference(AppUser.class, actorId);
         assignments.save(new GrievanceAssignment(grievance, assignee, actor, reason));
 
-        recordAndSave(grievance, from, GrievanceStatus.ASSIGNED, actorId, reason);
+        recordAndSave(grievance, from, GrievanceStatus.ASSIGNED, actorId, reason, null);
     }
 
     @Override
@@ -117,7 +117,7 @@ class GrievanceTransitionServiceImpl implements GrievanceTransitionService {
         // 6. Side effects
         grievance.applyHold(reasonType, ownerType, holdOwner, holdOwnerNote, OffsetDateTime.now());
 
-        recordAndSave(grievance, from, GrievanceStatus.ON_HOLD, actorId, reason);
+        recordAndSave(grievance, from, GrievanceStatus.ON_HOLD, actorId, reason, reasonType);
     }
 
     /** Steps 1-5. Returns the grievance, still in its original status. */
@@ -210,10 +210,10 @@ class GrievanceTransitionServiceImpl implements GrievanceTransitionService {
 
     /** Steps 7-8. */
     private void recordAndSave(Grievance grievance, GrievanceStatus from, GrievanceStatus target,
-                               UUID actorId, String reason) {
+                               UUID actorId, String reason, HoldReasonType holdReasonType) {
         // 7. Audit row, unconditionally. Authorization has confirmed the actor exists.
         AppUser actor = entityManager.getReference(AppUser.class, actorId);
-        history.save(new GrievanceStatusHistory(grievance, from, target, actor, reason));
+        history.save(new GrievanceStatusHistory(grievance, from, target, actor, reason, holdReasonType));
 
         // 8. Save
         grievances.save(grievance);
