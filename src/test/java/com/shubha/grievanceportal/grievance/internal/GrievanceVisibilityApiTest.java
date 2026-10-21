@@ -69,7 +69,7 @@ class GrievanceVisibilityApiTest {
 
     @BeforeEach
     void fixtures() throws Exception {
-        sanitation = persist(new Department("SANITATION", "Sanitation"));
+        sanitation = persist(new Department("TEST_SANITATION", "Sanitation"));
         water = persist(new Department("WATER", "Water"));
         w12 = persist(new Ward("W12", "Ward 12"));
         w7 = persist(new Ward("W7", "Ward 7"));

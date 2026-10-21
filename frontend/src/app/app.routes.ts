@@ -20,6 +20,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/citizen/citizen-home').then((m) => m.CitizenHome),
   },
   {
+    path: 'citizen/file',
+    canActivate: [citizenGuard],
+    loadComponent: () =>
+      import('./features/citizen/file-grievance/file-grievance').then((m) => m.FileGrievance),
+  },
+  {
     path: 'queue',
     canActivate: [staffGuard],
     loadComponent: () => import('./features/queue/queue').then((m) => m.Queue),

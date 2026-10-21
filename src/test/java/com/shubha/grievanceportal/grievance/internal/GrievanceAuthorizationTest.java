@@ -67,7 +67,7 @@ class GrievanceAuthorizationTest {
 
     @BeforeEach
     void fixtures() {
-        sanitation = em.persist(new Department("SANITATION", "Sanitation"));
+        sanitation = em.persist(new Department("TEST_SANITATION", "Sanitation"));
         water = em.persist(new Department("WATER", "Water"));
         w12 = em.persist(new Ward("W12", "Ward 12"));
         w7 = em.persist(new Ward("W7", "Ward 7"));

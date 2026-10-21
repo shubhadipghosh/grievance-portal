@@ -140,7 +140,7 @@ class IdentityRepositoriesTest {
         AppUser officer = users.save(AppUser.staff("Officer", null, "{bcrypt}y"));
         Role superAdmin = roles.findByCode("SUPER_ADMIN").orElseThrow();
         Role fieldOfficer = roles.findByCode("FIELD_OFFICER").orElseThrow();
-        Department dept = em.persist(new Department("SANITATION", "Sanitation"));
+        Department dept = em.persist(new Department("TEST_SANITATION", "Sanitation"));
         Ward ward = em.persist(new Ward("W12", "Ward 12"));
 
         grants.save(new UserRoleGrant(admin, superAdmin, null, null, null));

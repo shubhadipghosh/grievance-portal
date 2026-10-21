@@ -41,7 +41,7 @@ class OrganizationRepositoriesTest {
     @Test
     void databaseGeneratesIdsAndDefaults() {
         Ward ward = wards.saveAndFlush(new Ward("W12", "Ward 12"));
-        Department dept = departments.saveAndFlush(new Department("SANITATION", "Sanitation"));
+        Department dept = departments.saveAndFlush(new Department("TEST_SANITATION", "Sanitation"));
 
         assertThat(ward.getId()).isNotNull();
         assertThat(ward.getId().version()).isEqualTo(7);
@@ -56,8 +56,8 @@ class OrganizationRepositoriesTest {
 
     @Test
     void categoryHierarchyIsLazy() {
-        Department dept = departments.save(new Department("ROADS", "Roads"));
-        Category parent = categories.save(new Category("ROADS", null, dept, 72));
+        Department dept = departments.save(new Department("TEST_ROADS", "Roads"));
+        Category parent = categories.save(new Category("TEST_ROADS", null, dept, 72));
         Category child = categories.saveAndFlush(new Category("POTHOLE", parent, dept, 48));
         em.clear();
 

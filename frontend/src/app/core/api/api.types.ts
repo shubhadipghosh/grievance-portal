@@ -58,6 +58,56 @@ export interface GrievanceSummary {
   resolvedAt: string | null;
 }
 
+/** grievance.HoldReasonType */
+export type HoldReasonType =
+  | 'AWAITING_CITIZEN'
+  | 'AWAITING_CONTRACTOR'
+  | 'AWAITING_DEPARTMENT'
+  | 'AWAITING_BUDGET'
+  | 'OTHER';
+
+/** grievance.HoldOwnerType */
+export type HoldOwnerType = 'CITIZEN' | 'STAFF' | 'EXTERNAL';
+
+/** grievance.NewGrievance. Limits match the backend's @Size. */
+export interface NewGrievance {
+  categoryId: string;
+  wardId: string;
+  /** Max 200. */
+  title: string;
+  /** Max 5000. */
+  description: string;
+  /** Max 500. */
+  addressText: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+/** grievance.GrievanceDetails. Nullable fields are null when not applicable. */
+export interface GrievanceDetails {
+  id: string;
+  ticketNo: string;
+  status: GrievanceStatus;
+  priority: Priority;
+  categoryId: string;
+  departmentId: string;
+  wardId: string;
+  title: string;
+  description: string;
+  addressText: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  currentAssigneeId: string | null;
+  slaDueAt: string;
+  submittedAt: string;
+  resolvedAt: string | null;
+  closedAt: string | null;
+  reopenCount: number;
+  holdReasonType: HoldReasonType | null;
+  holdOwnerType: HoldOwnerType | null;
+  holdSince: string | null;
+}
+
 /** organization.DepartmentSummary */
 export interface DepartmentSummary {
   id: string;
@@ -67,6 +117,17 @@ export interface DepartmentSummary {
 /** organization.WardSummary */
 export interface WardSummary {
   id: string;
+  name: string;
+}
+
+/**
+ * organization.CategorySummary. name is in the browser's language, or English
+ * when there is no translation. Only a category no other lists as its parent
+ * may be filed against.
+ */
+export interface CategorySummary {
+  id: string;
+  parentId: string | null;
   name: string;
 }
 

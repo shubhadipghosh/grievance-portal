@@ -6,4 +6,8 @@ public class InvalidReferenceException extends RuntimeException {
     public InvalidReferenceException(String what, Object id) {
         super("Unknown or inactive " + what + ": " + id);
     }
+
+    public InvalidReferenceException(String message) {
+        super(message);
+    }
 }

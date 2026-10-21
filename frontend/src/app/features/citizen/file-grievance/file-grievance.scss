@@ -1,0 +1,59 @@
+main {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  padding: 0.75rem;
+}
+
+textarea {
+  resize: vertical;
+}
+
+button[type='submit'] {
+  width: 100%;
+}
+
+.counter {
+  text-align: right;
+}
+
+// The one thing the citizen must keep: large, and easy to select and copy.
+.ticket {
+  font-family: monospace;
+  font-size: 2rem;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  user-select: all;
+  overflow-wrap: anywhere;
+  margin: 0 0 1rem;
+}
+
+// Focused programmatically after filing so screen readers announce it.
+h1:focus {
+  outline: none;
+}
+
+.hint {
+  color: #595959;
+  margin: 0;
+}
+
+.field-error,
+.form-error {
+  color: #b00020;
+  margin: 0;
+}

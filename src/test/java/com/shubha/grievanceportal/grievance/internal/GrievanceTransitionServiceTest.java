@@ -94,7 +94,7 @@ class GrievanceTransitionServiceTest {
 
     @BeforeEach
     void fixtures() {
-        sanitation = em.persist(new Department("SANITATION", "Sanitation"));
+        sanitation = em.persist(new Department("TEST_SANITATION", "Sanitation"));
         w12 = em.persist(new Ward("W12", "Ward 12"));
         w7 = em.persist(new Ward("W7", "Ward 7"));
         Category category = em.persist(new Category("GARBAGE", null, sanitation, 48));

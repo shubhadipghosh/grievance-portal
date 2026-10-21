@@ -1,0 +1,129 @@
+<main>
+  @if (filed(); as grievance) {
+    <h1 #filedHeading tabindex="-1">Grievance filed</h1>
+    <p>Your ticket number is</p>
+    <p class="ticket">{{ grievance.ticketNo }}</p>
+    <p>Keep this number. You need it to check progress or to ask the office about it.</p>
+    <a routerLink="/citizen">My grievances</a>
+  } @else {
+    <h1>File a grievance</h1>
+
+    @if (listsError()) {
+      <div role="alert">
+        <p class="form-error">Could not load the form. Check your connection and try again.</p>
+        <button type="button" (click)="loadLists()">Try again</button>
+      </div>
+    } @else if (categories() === null) {
+      <p role="status">Loading…</p>
+    } @else {
+      @if (error(); as message) {
+        <p class="form-error" role="alert">{{ message }}</p>
+      }
+
+      <form novalidate (submit)="onSubmit($event)">
+        <div class="field">
+          <label for="category">Category</label>
+          <select
+            id="category"
+            [formField]="grievanceForm.categoryId"
+            [attr.aria-invalid]="
+              grievanceForm.categoryId().touched() && grievanceForm.categoryId().invalid()
+            "
+            aria-describedby="category-error"
+          >
+            <option value="">Choose a category</option>
+            @for (group of categoryGroups(); track group.label) {
+              @if (group.label === null) {
+                @for (c of group.options; track c.id) {
+                  <option [value]="c.id">{{ c.name }}</option>
+                }
+              } @else {
+                <optgroup [label]="group.label">
+                  @for (c of group.options; track c.id) {
+                    <option [value]="c.id">{{ c.name }}</option>
+                  }
+                </optgroup>
+              }
+            }
+          </select>
+          <p id="category-error" class="field-error">
+            @if (grievanceForm.categoryId().touched()) {
+              {{ grievanceForm.categoryId().errors()[0]?.message }}
+            }
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="ward">Ward</label>
+          <select
+            id="ward"
+            [formField]="grievanceForm.wardId"
+            [attr.aria-invalid]="grievanceForm.wardId().touched() && grievanceForm.wardId().invalid()"
+            aria-describedby="ward-error"
+          >
+            <option value="">Choose your ward</option>
+            @for (w of wards(); track w.id) {
+              <option [value]="w.id">{{ w.name }}</option>
+            }
+          </select>
+          <p id="ward-error" class="field-error">
+            @if (grievanceForm.wardId().touched()) {
+              {{ grievanceForm.wardId().errors()[0]?.message }}
+            }
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="title">Title</label>
+          <input
+            id="title"
+            type="text"
+            [formField]="grievanceForm.title"
+            [attr.aria-invalid]="grievanceForm.title().touched() && grievanceForm.title().invalid()"
+            aria-describedby="title-error"
+          />
+          <p id="title-error" class="field-error">
+            @if (grievanceForm.title().touched()) {
+              {{ grievanceForm.title().errors()[0]?.message }}
+            }
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="description">Description</label>
+          <textarea
+            id="description"
+            rows="6"
+            [formField]="grievanceForm.description"
+            [attr.aria-invalid]="
+              grievanceForm.description().touched() && grievanceForm.description().invalid()
+            "
+            aria-describedby="description-count description-error"
+          ></textarea>
+          <p id="description-count" class="hint counter">
+            {{ descriptionLength() }} / {{ descriptionMax }} characters
+          </p>
+          <p id="description-error" class="field-error">
+            @if (grievanceForm.description().touched()) {
+              {{ grievanceForm.description().errors()[0]?.message }}
+            }
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="address">Address or landmark (optional)</label>
+          <input
+            id="address"
+            type="text"
+            autocomplete="street-address"
+            [formField]="grievanceForm.addressText"
+          />
+        </div>
+
+        <button type="submit" [disabled]="grievanceForm().submitting()">
+          {{ grievanceForm().submitting() ? 'Filing…' : 'File grievance' }}
+        </button>
+      </form>
+    }
+  }
+</main>

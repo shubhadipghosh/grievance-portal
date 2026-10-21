@@ -27,6 +27,7 @@ import java.util.UUID;
 
 import static com.shubha.grievanceportal.CsrfTokens.csrfToken;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -62,7 +63,7 @@ class GrievanceApiTest {
 
     @BeforeEach
     void fixtures() {
-        sanitation = persist(new Department("SANITATION", "Sanitation"));
+        sanitation = persist(new Department("TEST_SANITATION", "Sanitation"));
         w12 = persist(new Ward("W12", "Ward 12"));
         garbage = persist(new Category("GARBAGE", null, sanitation, 48));
         citizen = persist(AppUser.citizen("+919800000301", "Asha Das"));
@@ -339,6 +340,23 @@ class GrievanceApiTest {
     void staffCannotFileAndGets403() throws Exception {
         expectProblem(mvc.perform(post("/api/v1/grievances").with(as(admin))
                 .contentType(MediaType.APPLICATION_JSON).content(newGrievanceJson("x"))), 403);
+    }
+
+    @Test
+    void parentCategoryIs422() throws Exception {
+        persist(new Category("OVERFLOWING_BIN", garbage, sanitation, 24));
+        em.flush();
+        ResultActions result = mvc.perform(post("/api/v1/grievances").with(as(citizen))
+                .contentType(MediaType.APPLICATION_JSON).content(newGrievanceJson("x")));
+        expectProblem(result, 422);
+        result.andExpect(jsonPath("$.detail").value(containsString("has sub-categories")));
+    }
+
+    @Test
+    void parentWhoseSubCategoriesAreAllInactiveCanBeFiledAgainst() throws Exception {
+        persist(new Category("OVERFLOWING_BIN", garbage, sanitation, 24)).setActive(false);
+        em.flush();
+        file();
     }
 
     @Test

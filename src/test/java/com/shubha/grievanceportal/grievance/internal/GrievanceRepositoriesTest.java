@@ -61,7 +61,7 @@ class GrievanceRepositoriesTest {
     void fixtures() {
         citizen = em.persist(AppUser.citizen("+919800000010", "Asha Das"));
         officer = em.persist(AppUser.staff("Ravi Sen", null, "{bcrypt}x"));
-        dept = em.persist(new Department("SANITATION", "Sanitation"));
+        dept = em.persist(new Department("TEST_SANITATION", "Sanitation"));
         ward = em.persist(new Ward("W12", "Ward 12"));
         category = em.persist(new Category("GARBAGE", null, dept, 48));
     }

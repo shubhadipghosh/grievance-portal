@@ -64,6 +64,17 @@ class GrievanceServiceImpl implements GrievanceService {
         if (category == null || !category.isActive()) {
             throw new InvalidReferenceException("category", request.categoryId());
         }
+        // Leaf-only: a parent has no routing rules of its own. Active children
+        // only, so a parent whose sub-categories are all retired, which the
+        // category list shows as a leaf, can be filed against again.
+        Long activeChildren = entityManager.createQuery(
+                        "select count(c) from Category c where c.parent = :category and c.active = true", Long.class)
+                .setParameter("category", category)
+                .getSingleResult();
+        if (activeChildren > 0) {
+            throw new InvalidReferenceException(
+                    "Category " + category.getId() + " has sub-categories; file under one of them");
+        }
         Ward ward = entityManager.find(Ward.class, request.wardId());
         if (ward == null || !ward.isActive()) {
             throw new InvalidReferenceException("ward", request.wardId());
