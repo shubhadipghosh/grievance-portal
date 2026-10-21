@@ -1,0 +1,47 @@
+<main>
+  <h1>Staff sign in</h1>
+
+  <form novalidate (submit)="onSubmit($event)">
+    @if (error(); as message) {
+      <p class="form-error" role="alert">{{ message }}</p>
+    }
+
+    <div class="field">
+      <label for="email">Email</label>
+      <input
+        id="email"
+        type="email"
+        autocomplete="username"
+        [formField]="loginForm.email"
+        [attr.aria-invalid]="loginForm.email().touched() && loginForm.email().invalid()"
+        aria-describedby="email-error"
+      />
+      <p id="email-error" class="field-error">
+        @if (loginForm.email().touched()) {
+          {{ loginForm.email().errors()[0]?.message }}
+        }
+      </p>
+    </div>
+
+    <div class="field">
+      <label for="password">Password</label>
+      <input
+        id="password"
+        type="password"
+        autocomplete="current-password"
+        [formField]="loginForm.password"
+        [attr.aria-invalid]="loginForm.password().touched() && loginForm.password().invalid()"
+        aria-describedby="password-error"
+      />
+      <p id="password-error" class="field-error">
+        @if (loginForm.password().touched()) {
+          {{ loginForm.password().errors()[0]?.message }}
+        }
+      </p>
+    </div>
+
+    <button type="submit" [disabled]="loginForm().submitting()">
+      {{ loginForm().submitting() ? 'Signing in…' : 'Sign in' }}
+    </button>
+  </form>
+</main>
