@@ -70,7 +70,7 @@ describe('CitizenLogin', () => {
     await settle();
     expect(el.querySelector('#phone-error')!.textContent).toContain('Enter your mobile number.');
 
-    for (const bad of ['98765', '5876543210', '+919876543210', '98765432101']) {
+    for (const bad of ['98765', '5876543210', '+91 58765 43210', '98765432101', '91987654321']) {
       type('phone', bad);
       await settle();
       expect(el.querySelector('#phone-error')!.textContent).toContain(
@@ -94,6 +94,25 @@ describe('CitizenLogin', () => {
     expect(code.getAttribute('maxlength')).toBe('6');
     expect(el.querySelector('label[for="code"]')!.textContent).toContain('+919876543210');
     expect(document.activeElement).toBe(code);
+  });
+
+  // What Android autofill and Indian contact lists actually offer.
+  it.each([
+    ['098765 43210', '+919876543210'],
+    ['+91 98765 43210', '+919876543210'],
+    ['98765-43210', '+919876543210'],
+    ['+919876543210', '+919876543210'],
+    [' 98765 43210 ', '+919876543210'],
+    ['919876543210', '+919876543210'],
+    // A real number starting 91 keeps its 91.
+    ['9123456789', '+919123456789'],
+  ])('accepts %j and sends %s', async (offered, sent) => {
+    await submitPhone(offered);
+    const req = backend.expectOne('/api/v1/auth/otp/send');
+    expect(req.request.body).toEqual({ phone: sent });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+    expect(el.querySelector('label[for="code"]')!.textContent).toContain(sent);
   });
 
   it.each([

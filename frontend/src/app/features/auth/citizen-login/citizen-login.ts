@@ -9,7 +9,15 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { form, FormField, maxLength, pattern, required, submit } from '@angular/forms/signals';
+import {
+  form,
+  FormField,
+  maxLength,
+  pattern,
+  required,
+  submit,
+  validate,
+} from '@angular/forms/signals';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import { tooManyAttemptsMessage } from '../../../core/auth/rate-limit';
@@ -34,7 +42,11 @@ export class CitizenLogin {
   protected readonly step = signal<'phone' | 'code'>('phone');
   protected readonly phoneForm = form(signal({ phone: '' }), (p) => {
     required(p.phone, { message: 'Enter your mobile number.' });
-    pattern(p.phone, /^[6-9]\d{9}$/, { message: INVALID_PHONE });
+    validate(p.phone, ({ value }) =>
+      /^[6-9]\d{9}$/.test(nationalNumber(value()))
+        ? undefined
+        : { kind: 'phone', message: INVALID_PHONE },
+    );
   });
   protected readonly codeForm = form(signal({ code: '' }), (p) => {
     required(p.code, { message: 'Enter the 6-digit code.' });
@@ -107,7 +119,7 @@ export class CitizenLogin {
   }
 
   protected e164(): string {
-    return `+91${this.phoneForm.phone().value()}`;
+    return `+91${nationalNumber(this.phoneForm.phone().value())}`;
   }
 
   /** Sends a code and starts the resend countdown. False if it failed; the error is shown. */
@@ -136,6 +148,15 @@ export class CitizenLogin {
       }
     }, 1000);
   }
+}
+
+/**
+ * The 10 digits from whatever autofill or a contact list offers:
+ * "098765 43210", "+91 98765 43210", "98765-43210", "919876543210".
+ * A bare 91 is stripped only from 12 digits, so a number starting 91 survives.
+ */
+function nationalNumber(raw: string): string {
+  return raw.replace(/[\s-]/g, '').replace(/^(\+91|0|91(?=\d{10}$))/, '');
 }
 
 function sendFailure(e: unknown): string {
