@@ -3,7 +3,7 @@
 
   <a class="primary" routerLink="/citizen/file">File a grievance</a>
 
-  <form class="lookup" novalidate (submit)="onLookup($event)">
+  <form class="lookup card" novalidate (submit)="onLookup($event)">
     <label for="ticketNo">Find by ticket number</label>
     <div class="lookup-row">
       <input
@@ -40,7 +40,7 @@
           <li>
             <a [routerLink]="['/citizen/grievances', g.id]">
               <span class="title">{{ g.title }}</span>
-              <span class="status">{{ statusLabels[g.status] }}</span>
+              <span class="status badge" [attr.data-status]="g.status">{{ statusLabels[g.status] }}</span>
               <span class="meta">{{ g.ticketNo }} · {{ g.wardName }}</span>
               <span class="meta">Filed {{ g.submittedAt | date: istFormat : istZone }}</span>
             </a>
@@ -58,6 +58,6 @@
   } @else if (loading()) {
     <p role="status">Loading…</p>
   } @else if (hasMore()) {
-    <button type="button" class="more" (click)="loadMore()">Show more</button>
+    <button type="button" class="more secondary" (click)="loadMore()">Show more</button>
   }
 </main>

@@ -170,3 +170,21 @@ export interface PagedModel<T> {
     totalPages: number;
   };
 }
+
+/** ProfileService.Profile. fullName is null for a citizen who has not given one yet. */
+export interface Profile {
+  type: UserType;
+  fullName: string | null;
+  phone: string | null;
+  email: string | null;
+  preferredLocale: Locale;
+}
+
+/** ProfileController.ProfileUpdateRequest */
+export interface ProfileUpdateRequest {
+  fullName: string;
+  preferredLocale: Locale;
+}
+
+/** The languages category names are translated into (V9). */
+export type Locale = 'en' | 'bn';

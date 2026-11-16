@@ -1,0 +1,39 @@
+@if (user()) {
+  <button
+    #toggle
+    type="button"
+    class="avatar"
+    aria-label="Account"
+    aria-controls="account-panel"
+    [attr.aria-expanded]="open()"
+    (click)="toggleOpen()"
+  >
+    @if (initials(); as letters) {
+      <span aria-hidden="true">{{ letters }}</span>
+    } @else {
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.4 0-8 2.2-8 5v2h16v-2c0-2.8-3.6-5-8-5Z" />
+      </svg>
+    }
+  </button>
+
+  @if (open()) {
+    <div id="account-panel" class="panel">
+      <div class="who">
+        <p class="name">{{ displayName() }}</p>
+        @if (contact(); as value) {
+          <p class="contact">{{ value }}</p>
+        }
+      </div>
+
+      <a routerLink="/profile" class="item" (click)="close()">My profile</a>
+
+      @if (error(); as message) {
+        <p class="error" role="alert">{{ message }}</p>
+      }
+      <button type="button" class="item sign-out" [disabled]="signingOut()" (click)="signOut()">
+        {{ signingOut() ? 'Signing out…' : 'Sign out' }}
+      </button>
+    </div>
+  }
+}

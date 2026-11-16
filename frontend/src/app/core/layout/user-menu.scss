@@ -1,0 +1,99 @@
+:host {
+  position: relative;
+}
+
+// White on the blue header bar; still a 48px touch target.
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid rgb(255 255 255 / 70%);
+  background: rgb(255 255 255 / 15%);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.avatar:hover:not(:disabled) {
+  background: rgb(255 255 255 / 25%);
+}
+
+.avatar:focus-visible {
+  box-shadow: 0 0 0 3px #fff;
+}
+
+.avatar svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: currentColor;
+}
+
+.panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 10;
+  width: min(18rem, calc(100vw - 2rem));
+  padding: 0.5rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 18%);
+}
+
+.who {
+  padding: 0.5rem 0.75rem 0.75rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.who p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.contact {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+// Links and the sign-out button look alike: full-width rows.
+.item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+}
+
+.item:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+}
+
+.sign-out {
+  color: var(--color-danger);
+}
+
+.error {
+  color: var(--color-danger);
+  font-size: 0.875rem;
+  margin: 0.25rem 0.75rem;
+}

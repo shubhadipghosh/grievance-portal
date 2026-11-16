@@ -1,24 +1,9 @@
 main {
-  max-width: 24rem;
-  margin: 0 auto;
-  padding: 1rem;
+  max-width: 26rem;
+  padding-top: 2.5rem;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: 0.75rem;
-}
-
-input,
-button {
-  font: inherit;
-  padding: 0.75rem;
-}
-
-.field-error,
-.form-error {
-  color: #b00020;
-  margin: 0;
+.lead {
+  color: var(--color-muted);
+  margin: -0.5rem 0 1.5rem;
 }

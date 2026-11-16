@@ -1,42 +1,19 @@
-main {
-  max-width: 32rem;
-  margin: 0 auto;
-  padding: 1rem;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: 0.75rem;
-}
-
-input,
-select,
-textarea,
-button {
-  font: inherit;
-  padding: 0.75rem;
-}
-
-textarea {
-  resize: vertical;
-}
-
-button[type='submit'] {
-  width: 100%;
-}
-
 .counter {
   text-align: right;
 }
 
 // The one thing the citizen must keep: large, and easy to select and copy.
 .ticket {
-  font-family: monospace;
+  font-family: ui-monospace, 'Cascadia Mono', 'Roboto Mono', monospace;
   font-size: 2rem;
   font-weight: bold;
   letter-spacing: 0.05em;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border: 1px dashed var(--color-primary);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  text-align: center;
   user-select: all;
   overflow-wrap: anywhere;
   margin: 0 0 1rem;
@@ -47,13 +24,6 @@ h1:focus {
   outline: none;
 }
 
-.hint {
-  color: #595959;
-  margin: 0;
-}
-
-.field-error,
-.form-error {
-  color: #b00020;
-  margin: 0;
+.back {
+  font-weight: 600;
 }

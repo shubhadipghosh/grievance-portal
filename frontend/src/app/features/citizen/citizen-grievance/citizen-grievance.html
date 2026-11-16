@@ -1,5 +1,5 @@
 <main>
-  <a routerLink="/citizen">← My grievances</a>
+  <a class="back" routerLink="/citizen">← My grievances</a>
 
   @if (error(); as message) {
     <div role="alert">
@@ -7,36 +7,38 @@
       <button type="button" (click)="load()">Try again</button>
     </div>
   } @else if (grievance(); as g) {
-    <h1>{{ g.title }}</h1>
-    <p class="ticket">{{ g.ticketNo }}</p>
+    <div class="card summary">
+      <h1>{{ g.title }}</h1>
+      <p class="ticket">{{ g.ticketNo }}</p>
 
-    <dl class="facts">
-      <div>
-        <dt>Status</dt>
-        <dd class="status">
-          {{ statusLabels[g.status] }}
-          @if (g.holdReasonType; as hold) {
-            · {{ holdReasonLabels[hold] }}
-          }
-        </dd>
-      </div>
-      <div>
-        <dt>Filed</dt>
-        <dd>{{ g.submittedAt | date: istFormat : istZone }}</dd>
-      </div>
-      @if (g.resolvedAt) {
+      <dl class="facts">
         <div>
-          <dt>Resolved</dt>
-          <dd>{{ g.resolvedAt | date: istFormat : istZone }}</dd>
+          <dt>Status</dt>
+          <dd class="status">
+            <span class="badge" [attr.data-status]="g.status">{{ statusLabels[g.status] }}</span>
+            @if (g.holdReasonType; as hold) {
+              · {{ holdReasonLabels[hold] }}
+            }
+          </dd>
         </div>
-      }
-      @if (g.closedAt) {
         <div>
-          <dt>Closed</dt>
-          <dd>{{ g.closedAt | date: istFormat : istZone }}</dd>
+          <dt>Filed</dt>
+          <dd>{{ g.submittedAt | date: istFormat : istZone }}</dd>
         </div>
-      }
-    </dl>
+        @if (g.resolvedAt) {
+          <div>
+            <dt>Resolved</dt>
+            <dd>{{ g.resolvedAt | date: istFormat : istZone }}</dd>
+          </div>
+        }
+        @if (g.closedAt) {
+          <div>
+            <dt>Closed</dt>
+            <dd>{{ g.closedAt | date: istFormat : istZone }}</dd>
+          </div>
+        }
+      </dl>
+    </div>
 
     @if (resolutionNote(); as note) {
       <section class="resolution" aria-labelledby="resolution-heading">
@@ -45,7 +47,7 @@
       </section>
     }
 
-    <section aria-labelledby="history-heading">
+    <section class="card" aria-labelledby="history-heading">
       <h2 id="history-heading">History</h2>
       <ol class="timeline" reversed>
         @for (h of timeline(); track $index) {

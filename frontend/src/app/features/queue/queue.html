@@ -1,7 +1,7 @@
 <main>
   <h1>Queue</h1>
 
-  <div class="filters">
+  <div class="filters card">
     <div class="field">
       <label for="department">Department</label>
       <select
@@ -47,7 +47,7 @@
   } @else if (grievances().length === 0) {
     <p>No grievances in this department with status “{{ statusLabels[status()] }}”.</p>
   } @else {
-    <div class="table-scroll" role="region" aria-label="Grievances" tabindex="0">
+    <div class="table-scroll card" role="region" aria-label="Grievances" tabindex="0">
       <table>
         <thead>
           <tr>
@@ -64,7 +64,7 @@
             <tr (click)="open(g)">
               <td><a [routerLink]="['/grievances', g.id]">{{ g.ticketNo }}</a></td>
               <td>{{ g.title }}</td>
-              <td>{{ statusLabels[g.status] }}</td>
+              <td><span class="badge" [attr.data-status]="g.status">{{ statusLabels[g.status] }}</span></td>
               <td>{{ g.wardName }}</td>
               <td [class.overdue]="isOverdue(g)">
                 {{ g.slaDueAt | date: 'd MMM yyyy, HH:mm' : '+0530' }}
@@ -87,6 +87,7 @@
       <nav class="pager" aria-label="Pages">
         <button
           type="button"
+          class="secondary"
           [disabled]="loading() || p.number === 0"
           (click)="load(p.number - 1)"
         >
@@ -95,6 +96,7 @@
         <span>Page {{ p.number + 1 }} of {{ p.totalPages }} ({{ p.totalElements }} grievances)</span>
         <button
           type="button"
+          class="secondary"
           [disabled]="loading() || p.number + 1 >= p.totalPages"
           (click)="load(p.number + 1)"
         >

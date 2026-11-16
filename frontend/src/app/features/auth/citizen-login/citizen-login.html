@@ -1,80 +1,83 @@
 <main>
-  <h1>Sign in</h1>
+  <div class="card">
+    <h1>Sign in</h1>
+    <p class="lead">Report a civic problem and track it to resolution.</p>
 
-  @if (error(); as message) {
-    <p class="form-error" role="alert">{{ message }}</p>
-  }
-  <p class="notice" role="status">{{ notice() }}</p>
+    @if (error(); as message) {
+      <p class="form-error" role="alert">{{ message }}</p>
+    }
+    <p class="notice" role="status">{{ notice() }}</p>
 
-  @if (step() === 'phone') {
-    <form novalidate (submit)="onSendCode($event)">
-      <div class="field">
-        <label for="phone">Mobile number</label>
-        <div class="phone">
-          <span class="prefix" aria-hidden="true">+91</span>
-          <input
-            id="phone"
-            type="tel"
-            inputmode="numeric"
-            autocomplete="tel-national"
-            [formField]="phoneForm.phone"
-            [attr.aria-invalid]="phoneForm.phone().touched() && phoneForm.phone().invalid()"
-            aria-describedby="phone-hint phone-error"
-          />
+    @if (step() === 'phone') {
+      <form novalidate (submit)="onSendCode($event)">
+        <div class="field">
+          <label for="phone">Mobile number</label>
+          <div class="phone">
+            <span class="prefix" aria-hidden="true">+91</span>
+            <input
+              id="phone"
+              type="tel"
+              inputmode="numeric"
+              autocomplete="tel-national"
+              [formField]="phoneForm.phone"
+              [attr.aria-invalid]="phoneForm.phone().touched() && phoneForm.phone().invalid()"
+              aria-describedby="phone-hint phone-error"
+            />
+          </div>
+          <p id="phone-hint" class="hint">10 digits, without +91. We will text you a code.</p>
+          <p id="phone-error" class="field-error">
+            @if (phoneForm.phone().touched()) {
+              {{ phoneForm.phone().errors()[0]?.message }}
+            }
+          </p>
         </div>
-        <p id="phone-hint" class="hint">10 digits, without +91. We will text you a code.</p>
-        <p id="phone-error" class="field-error">
-          @if (phoneForm.phone().touched()) {
-            {{ phoneForm.phone().errors()[0]?.message }}
+
+        <button type="submit" [disabled]="phoneForm().submitting()">
+          {{ phoneForm().submitting() ? 'Sending…' : 'Send code' }}
+        </button>
+      </form>
+    } @else {
+      <form novalidate (submit)="onVerify($event)">
+        <div class="field">
+          <label for="code">Code sent to {{ e164() }}</label>
+          <input
+            #codeInput
+            id="code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            [formField]="codeForm.code"
+            [attr.aria-invalid]="codeForm.code().touched() && codeForm.code().invalid()"
+            aria-describedby="code-error"
+          />
+          <p id="code-error" class="field-error">
+            @if (codeForm.code().touched()) {
+              {{ codeForm.code().errors()[0]?.message }}
+            }
+          </p>
+        </div>
+
+        <button type="submit" [disabled]="codeForm().submitting()">
+          {{ codeForm().submitting() ? 'Checking…' : 'Sign in' }}
+        </button>
+      </form>
+
+      <div class="secondary">
+        <button
+          type="button"
+          class="link"
+          id="resend"
+          [disabled]="resendIn() > 0 || resending()"
+          (click)="onResend()"
+        >
+          @if (resendIn() > 0) {
+            Resend code in {{ resendIn() }}s
+          } @else {
+            {{ resending() ? 'Sending…' : 'Resend code' }}
           }
-        </p>
+        </button>
+        <button type="button" class="link" (click)="onChangeNumber()">Change number</button>
       </div>
-
-      <button type="submit" [disabled]="phoneForm().submitting()">
-        {{ phoneForm().submitting() ? 'Sending…' : 'Send code' }}
-      </button>
-    </form>
-  } @else {
-    <form novalidate (submit)="onVerify($event)">
-      <div class="field">
-        <label for="code">Code sent to {{ e164() }}</label>
-        <input
-          #codeInput
-          id="code"
-          type="text"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          [formField]="codeForm.code"
-          [attr.aria-invalid]="codeForm.code().touched() && codeForm.code().invalid()"
-          aria-describedby="code-error"
-        />
-        <p id="code-error" class="field-error">
-          @if (codeForm.code().touched()) {
-            {{ codeForm.code().errors()[0]?.message }}
-          }
-        </p>
-      </div>
-
-      <button type="submit" [disabled]="codeForm().submitting()">
-        {{ codeForm().submitting() ? 'Checking…' : 'Sign in' }}
-      </button>
-    </form>
-
-    <div class="secondary">
-      <button
-        type="button"
-        class="link"
-        id="resend"
-        [disabled]="resendIn() > 0 || resending()"
-        (click)="onResend()"
-      >
-        @if (resendIn() > 0) {
-          Resend code in {{ resendIn() }}s
-        } @else {
-          {{ resending() ? 'Sending…' : 'Resend code' }}
-        }
-      </button>
-      <button type="button" class="link" (click)="onChangeNumber()">Change number</button>
-    </div>
-  }
+    }
+  </div>
 </main>

@@ -1,0 +1,75 @@
+<main>
+  <h1>My profile</h1>
+
+  @if (loadError()) {
+    <div role="alert">
+      <p class="form-error">Could not load your profile. Check your connection and try again.</p>
+      <button type="button" (click)="load()">Try again</button>
+    </div>
+  } @else if (profile(); as p) {
+    <section class="card account" aria-labelledby="account-heading">
+      <h2 id="account-heading">Sign-in details</h2>
+      <dl>
+        @if (p.phone) {
+          <div>
+            <dt>Mobile number</dt>
+            <dd>{{ p.phone }}</dd>
+          </div>
+        }
+        @if (p.email) {
+          <div>
+            <dt>Email</dt>
+            <dd>{{ p.email }}</dd>
+          </div>
+        }
+      </dl>
+      <p class="hint">You sign in with this, so it cannot be changed here.</p>
+    </section>
+
+    <form class="card" novalidate (submit)="onSubmit($event)">
+      <h2>Your details</h2>
+
+      @if (error(); as message) {
+        <p class="form-error" role="alert">{{ message }}</p>
+      }
+
+      <div class="field">
+        <label for="fullName">Full name</label>
+        <input
+          id="fullName"
+          type="text"
+          autocomplete="name"
+          [formField]="profileForm.fullName"
+          [attr.aria-invalid]="profileForm.fullName().touched() && profileForm.fullName().invalid()"
+          aria-describedby="fullName-error"
+        />
+        <p id="fullName-error" class="field-error">
+          @if (profileForm.fullName().touched()) {
+            {{ profileForm.fullName().errors()[0]?.message }}
+          }
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="preferredLocale">Preferred language</label>
+        <select id="preferredLocale" [formField]="profileForm.preferredLocale">
+          @for (l of languages; track l.value) {
+            <option [value]="l.value">{{ l.label }}</option>
+          }
+        </select>
+      </div>
+
+      <p class="saved" role="status">
+        @if (saved()) {
+          Your details have been saved.
+        }
+      </p>
+
+      <button type="submit" [disabled]="profileForm().submitting()">
+        {{ profileForm().submitting() ? 'Saving…' : 'Save changes' }}
+      </button>
+    </form>
+  } @else {
+    <p role="status">Loading…</p>
+  }
+</main>

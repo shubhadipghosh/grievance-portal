@@ -1,14 +1,11 @@
 main {
-  max-width: 24rem;
-  margin: 0 auto;
-  padding: 1rem;
+  max-width: 26rem;
+  padding-top: 2.5rem;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: 0.75rem;
+.lead {
+  color: var(--color-muted);
+  margin: -0.5rem 0 1.5rem;
 }
 
 .phone {
@@ -18,29 +15,25 @@ main {
 .prefix {
   display: flex;
   align-items: center;
-  padding: 0 0.75rem;
-  border: 1px solid #767676;
+  padding: 0 0.875rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  background: var(--color-page);
+  border: 1px solid var(--color-border);
   border-right: 0;
-  background: #f2f2f2;
+  border-radius: var(--radius) 0 0 var(--radius);
 }
 
 .phone input {
   flex: 1;
   min-width: 0;
-}
-
-input,
-button {
-  font: inherit;
-  padding: 0.75rem;
+  border-radius: 0 var(--radius) var(--radius) 0;
 }
 
 #code {
+  font-size: 1.25rem;
   letter-spacing: 0.3em;
-}
-
-button[type='submit'] {
-  width: 100%;
+  text-align: center;
 }
 
 .secondary {
@@ -52,33 +45,28 @@ button[type='submit'] {
 
 // Text buttons, but still a 48px touch target.
 .link {
-  min-height: 48px;
+  padding: 0;
   background: none;
   border: 0;
-  color: #0b57d0;
+  color: var(--color-primary);
+  font-weight: 500;
   text-decoration: underline;
 }
 
+.link:hover:not(:disabled) {
+  background: none;
+}
+
 .link:disabled {
-  color: #595959;
+  color: var(--color-muted);
+  opacity: 1;
   text-decoration: none;
 }
 
-.hint {
-  color: #595959;
-  margin: 0;
-}
-
 .notice {
-  margin: 0 0 0.75rem;
+  margin: 0 0 1rem;
 }
 
 .notice:empty {
   display: none;
-}
-
-.field-error,
-.form-error {
-  color: #b00020;
-  margin: 0;
 }

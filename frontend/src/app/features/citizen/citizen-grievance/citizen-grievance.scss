@@ -1,12 +1,14 @@
-main {
-  max-width: 32rem;
-  margin: 0 auto;
-  padding: 1rem;
+.back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
-button {
-  font: inherit;
-  padding: 0.75rem;
+.card + .card,
+.resolution + .card {
+  margin-top: 1rem;
 }
 
 h1 {
@@ -15,26 +17,30 @@ h1 {
 }
 
 h2 {
-  font-size: 1.125rem;
+  margin-top: 0;
 }
 
 .ticket {
-  font-family: monospace;
+  font-family: ui-monospace, 'Cascadia Mono', 'Roboto Mono', monospace;
+  color: var(--color-muted);
   margin: 0 0 1rem;
   user-select: all;
 }
 
 // Label above value: no columns to squeeze on a narrow screen.
 .facts {
-  margin: 0 0 1rem;
+  margin: 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
 }
 
 .facts div + div {
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
 }
 
 .facts dt {
-  color: #595959;
+  color: var(--color-muted);
+  font-size: 0.875rem;
 }
 
 .facts dd {
@@ -42,16 +48,25 @@ h2 {
 }
 
 .status {
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .resolution {
-  border-left: 4px solid #1e7d32;
-  padding: 0 0.75rem;
-  margin-bottom: 1rem;
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  background: #ecfdf3;
+  border: 1px solid #abefc6;
+  border-left: 4px solid var(--color-success);
+  border-radius: var(--radius);
+}
+
+.resolution h2 {
+  color: var(--color-success);
+  margin-bottom: 0.5rem;
 }
 
 .resolution p {
+  margin: 0;
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
@@ -61,29 +76,34 @@ h2 {
   list-style: none;
   margin: 0;
   padding: 0 0 0 1.25rem;
-  border-left: 2px solid #767676;
+  border-left: 2px solid var(--color-border);
 }
 
 .timeline li {
   position: relative;
-  padding-bottom: 1rem;
+  padding-bottom: 1.25rem;
+}
+
+.timeline li:last-child {
+  padding-bottom: 0;
 }
 
 .timeline li::before {
   content: '';
   position: absolute;
-  left: calc(-1.25rem - 6px);
-  top: 0.35rem;
-  width: 10px;
-  height: 10px;
+  left: calc(-1.25rem - 7px);
+  top: 0.3rem;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: #fff;
-  border: 2px solid #0b57d0;
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary);
 }
 
 // The current state.
 .timeline li:first-child::before {
-  background: #0b57d0;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
 .timeline p {
@@ -91,20 +111,19 @@ h2 {
 }
 
 .what {
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .when {
-  color: #595959;
+  color: var(--color-muted);
+  font-size: 0.875rem;
 }
 
-.note {
-  margin-top: 0.25rem;
+.timeline .note {
+  margin-top: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-page);
+  border-radius: var(--radius);
   white-space: pre-line;
   overflow-wrap: anywhere;
-}
-
-.form-error {
-  color: #b00020;
-  margin: 0;
 }

@@ -4,7 +4,7 @@
     <p>Your ticket number is</p>
     <p class="ticket">{{ grievance.ticketNo }}</p>
     <p>Keep this number. You need it to check progress or to ask the office about it.</p>
-    <a routerLink="/citizen">My grievances</a>
+    <a class="back" routerLink="/citizen">← My grievances</a>
   } @else {
     <h1>File a grievance</h1>
 
@@ -20,7 +20,7 @@
         <p class="form-error" role="alert">{{ message }}</p>
       }
 
-      <form novalidate (submit)="onSubmit($event)">
+      <form class="card" novalidate (submit)="onSubmit($event)">
         <div class="field">
           <label for="category">Category</label>
           <select

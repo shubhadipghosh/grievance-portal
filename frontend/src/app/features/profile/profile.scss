@@ -1,0 +1,41 @@
+h2 {
+  margin-top: 0;
+}
+
+.card + .card {
+  margin-top: 1rem;
+}
+
+.account dl {
+  margin: 0 0 0.75rem;
+}
+
+.account div + div {
+  margin-top: 0.75rem;
+}
+
+.account dt {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.account dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+// Confirmation after saving. Green text, plus a tick so it is not colour alone.
+.saved {
+  color: var(--color-success);
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.saved:empty {
+  display: none;
+}
+
+.saved:not(:empty)::before {
+  content: '✓ ';
+}

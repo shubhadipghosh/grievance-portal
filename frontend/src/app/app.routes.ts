@@ -39,6 +39,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/queue/queue').then((m) => m.Queue),
   },
   {
+    path: 'profile',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/profile/profile').then((m) => m.Profile),
+  },
+  {
     // Citizens will view their own grievances here too; the backend decides which.
     path: 'grievances/:id',
     canActivate: [authGuard],
