@@ -31,6 +31,17 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
             """)
     List<SummaryRow> findActiveSummaries(@Param("languages") String[] languages);
 
+    /** One category's name in the first of {@code languages} it has a translation for. Active or not. */
+    @Query(nativeQuery = true, value = """
+            select t.name
+            from category_translation t
+            where t.category_id = :id
+              and t.locale = any(:languages)
+            order by array_position(:languages, t.locale::text)
+            limit 1
+            """)
+    Optional<String> findName(@Param("id") UUID id, @Param("languages") String[] languages);
+
     interface SummaryRow {
         UUID getId();
 

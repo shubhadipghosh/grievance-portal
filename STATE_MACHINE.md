@@ -380,12 +380,15 @@ permission check does not clear is treated as a citizen. Both rules live
 in `HistoryEntry.forCitizen`, and `GrievanceHistoryApiTest` fails if
 either is loosened.
 
-**Rule 1: officers are never named to citizens.** The citizen view
-carries the actor's type only (CITIZEN, STAFF, SYSTEM), and the UI shows
-"You", "Municipal staff", "System". `actorName` is always null. This is a
-safety decision as much as a privacy one: municipal officers have been
-harassed over complaint decisions. Reversing it is the stakeholder's
-call, not an engineering one.
+**Rule 1: names are shown to citizens.** The citizen view carries the
+actor's type and name, as the staff view does. The ticket page also names
+the assignee and the department admins to the citizen.
+
+*Reversed by the stakeholder on 2026-11-17.* The original rule was that
+officers are never named to citizens, as a safety measure: municipal
+officers have been harassed over complaint decisions. The ticket page
+(Jira-style, everyone sees assignment and department events) required
+names. Rule 2 below is unchanged.
 
 **Rule 2: staff free text is shown to citizens only where it is written
 for them.**
@@ -403,6 +406,24 @@ for ON_HOLD the citizen gets the category ("Awaiting contractor") and
 never the text. The category is recorded on the history row itself
 (V10): `grievance.hold_reason_type` is cleared when the hold ends. Holds
 recorded before V10 have no category on their row.
+
+### The ticket page
+
+`GET /{id}/activity` merges status changes, assignments, re-routes and
+comments into one feed, oldest first. The same split applies:
+
+| Item | Viewer without `GRIEVANCE_VIEW_INTERNAL` sees |
+|---|---|
+| Status change | as `/history` above |
+| Assignment | who assigned whom, and the previous assignee; never the reason |
+| Re-route | department/category from → to; never the reason |
+| Comment, `internal_only = false` | yes |
+| Comment, `internal_only = true` (internal remark) | **never** |
+
+`POST /{id}/comments`: a comment everyone sees needs `CITIZEN_OWNER` or
+`GRIEVANCE_COMMENT` in scope; an internal remark needs
+`GRIEVANCE_COMMENT`, so a citizen can never post one (403). Comments are
+not transitions and do not touch `grievance_status_history`.
 
 ## Implementation note
 

@@ -13,7 +13,7 @@ import java.util.UUID;
  * in STATE_MACHINE.md ("What citizens see"); do not loosen it here without
  * the stakeholder's decision.
  *
- * @param actorName null in the citizen view: officers are never named to citizens
+ * @param actorName null only for a citizen who has not given a name
  * @param reason    null when absent or withheld
  */
 record HistoryEntry(
@@ -32,8 +32,8 @@ record HistoryEntry(
     }
 
     /**
-     * For anyone else: no names, and the free-text reason only where it is
-     * written for the citizen. ON_HOLD shows its category, never its text.
+     * For anyone else: the free-text reason only where it is written for the
+     * citizen. ON_HOLD shows its category, never its text.
      */
     static HistoryEntry forCitizen(StatusChange c, UUID viewerId) {
         boolean own = c.actorId().equals(viewerId);
@@ -42,7 +42,7 @@ record HistoryEntry(
             case REOPENED, CLOSED -> own;
             default -> false;
         };
-        return new HistoryEntry(c.fromStatus(), c.toStatus(), c.occurredAt(), c.actorType(), null,
+        return new HistoryEntry(c.fromStatus(), c.toStatus(), c.occurredAt(), c.actorType(), c.actorName(),
                 showReason ? c.reason() : null, c.holdReasonType());
     }
 }

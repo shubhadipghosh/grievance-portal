@@ -1,0 +1,459 @@
+// Mobile first: one column, details below the description. From 960px the
+// details move to a sticky side panel, as in an issue tracker.
+
+main {
+  max-width: 72rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+// ------------------------------------------------------------------ header
+
+.ticket-header {
+  margin-bottom: 1rem;
+}
+
+.ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.375rem;
+}
+
+.ticket-no {
+  font-family: ui-monospace, 'Cascadia Mono', 'Roboto Mono', monospace;
+  color: var(--color-muted);
+  user-select: all;
+}
+
+.priority {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #93370d;
+}
+
+.priority[data-priority='CRITICAL'] {
+  color: var(--color-danger);
+}
+
+.priority[data-priority='LOW'] {
+  color: var(--color-muted);
+}
+
+h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+h2 {
+  margin: 0 0 0.75rem;
+}
+
+// ------------------------------------------------------------------ layout
+
+.layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-areas:
+    'primary'
+    'details';
+}
+
+.primary {
+  grid-area: primary;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.details {
+  grid-area: details;
+}
+
+// On a phone the details matter more than the feed: put them right after
+// the description, which is the primary column's first card.
+@media (max-width: 959.98px) {
+  .layout {
+    grid-template-areas: none;
+  }
+
+  .primary {
+    display: contents;
+  }
+
+  .primary > :first-child {
+    order: 0;
+  }
+
+  .details {
+    order: 1;
+  }
+
+  .primary > :not(:first-child) {
+    order: 2;
+  }
+}
+
+@media (min-width: 960px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    grid-template-areas: 'primary details';
+    align-items: start;
+  }
+
+  .details {
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+// ------------------------------------------------------------ description
+
+.description {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.location {
+  margin: 1rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+  overflow-wrap: anywhere;
+}
+
+.location .label {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.location a {
+  margin-left: 0.25rem;
+  white-space: nowrap;
+}
+
+.resolution {
+  padding: 1rem 1.25rem;
+  background: #ecfdf3;
+  border: 1px solid #abefc6;
+  border-left: 4px solid var(--color-success);
+  border-radius: var(--radius);
+}
+
+.resolution h2 {
+  color: var(--color-success);
+  margin-bottom: 0.5rem;
+}
+
+.resolution p {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+// --------------------------------------------------------------- activity
+
+.activity-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.activity-head h2 {
+  margin: 0;
+}
+
+.filters,
+.modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+// Toggle buttons: smaller than a form button but still a 44px touch target.
+button.chip,
+button.mode {
+  min-height: 44px;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+button.chip:hover:not(:disabled),
+button.mode:hover:not(:disabled) {
+  background: var(--color-primary-soft);
+}
+
+button.chip[aria-pressed='true'] {
+  color: #fff;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+button.mode[aria-pressed='true'] {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.composer.internal button.mode[aria-pressed='true'] {
+  color: #7a2e0e;
+  background: #fef0c7;
+  border-color: #b54708;
+}
+
+// Composer: an internal remark is tinted amber, so nobody mistakes it for a
+// reply the citizen will read.
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem;
+  background: var(--color-page);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.composer.internal {
+  background: #fffaeb;
+  border-color: #fedf89;
+}
+
+.composer-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.composer .form-error {
+  margin: 0;
+}
+
+.over {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.feed > li + li {
+  margin-top: 1rem;
+}
+
+.feed p {
+  margin: 0;
+}
+
+time {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}
+
+.avatar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.avatar.small {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.6875rem;
+}
+
+.comment {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.bubble {
+  flex: 1;
+  min-width: 0;
+  padding: 0.625rem 0.875rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.comment.internal .bubble {
+  background: #fffaeb;
+  border-color: #fedf89;
+  border-left: 4px solid #b54708;
+}
+
+.byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  margin-bottom: 0.25rem !important;
+}
+
+.role,
+.internal-tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+}
+
+.role {
+  color: #344054;
+  background: #eef1f5;
+}
+
+.internal-tag {
+  color: #7a2e0e;
+  background: #fef0c7;
+}
+
+.body {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+// Events are quieter than comments: a dot, one line, the time below.
+.event {
+  display: flex;
+  gap: 0.75rem;
+  padding-left: 0.75rem;
+}
+
+.dot {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin: 0.375rem 0.75rem 0 0;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary);
+}
+
+.event[data-kind='ASSIGNMENT'] .dot {
+  border-color: #5925dc;
+}
+
+.event[data-kind='REROUTE'] .dot {
+  border-color: #b54708;
+}
+
+.what {
+  overflow-wrap: anywhere;
+}
+
+.what .badge {
+  vertical-align: 1px;
+}
+
+.event .note {
+  margin-top: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-page);
+  border-radius: var(--radius);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+// ---------------------------------------------------------------- details
+
+.details dl {
+  margin: 0;
+}
+
+.details dl > div {
+  padding: 0.625rem 0;
+}
+
+.details dl > div + div {
+  border-top: 1px solid var(--color-border);
+}
+
+.details dt {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.details dd {
+  margin: 0.25rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.muted,
+.sub {
+  color: var(--color-muted);
+}
+
+.sub {
+  font-size: 0.875rem;
+}
+
+.sla {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  color: #05603a;
+  background: #dcfae6;
+}
+
+.sla.overdue {
+  color: #912018;
+  background: #fee4e2;
+}

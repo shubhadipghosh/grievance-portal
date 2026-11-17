@@ -2,13 +2,15 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Service } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
+  ActivityItem,
   CitizenGrievanceSummary,
   GrievanceDetails,
   GrievanceStatus,
   GrievanceSummary,
-  HistoryEntry,
+  NewComment,
   NewGrievance,
   PagedModel,
+  TicketOverview,
 } from './api.types';
 
 @Service()
@@ -40,9 +42,21 @@ export class GrievanceService {
     );
   }
 
-  /** Oldest first. Redacted by the backend for citizens. */
-  history(id: string): Promise<HistoryEntry[]> {
-    return firstValueFrom(this.http.get<HistoryEntry[]>(`/api/v1/grievances/${id}/history`));
+  /** The ticket page's header and side panel. The category is named in the browser's language. */
+  overview(id: string): Promise<TicketOverview> {
+    return firstValueFrom(this.http.get<TicketOverview>(`/api/v1/grievances/${id}/overview`));
+  }
+
+  /** Comments and events, oldest first. Internal remarks only reach staff. */
+  activity(id: string): Promise<ActivityItem[]> {
+    return firstValueFrom(this.http.get<ActivityItem[]>(`/api/v1/grievances/${id}/activity`));
+  }
+
+  /** 403 for an internal remark from a citizen, or a viewer who may not comment. */
+  comment(id: string, comment: NewComment): Promise<ActivityItem> {
+    return firstValueFrom(
+      this.http.post<ActivityItem>(`/api/v1/grievances/${id}/comments`, comment),
+    );
   }
 
   /** GET /grievances: one department's grievances in one status, one page at a time. */

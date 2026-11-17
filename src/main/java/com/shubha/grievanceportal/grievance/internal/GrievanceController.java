@@ -11,17 +11,21 @@ import com.shubha.grievanceportal.grievance.HoldReasonType;
 import com.shubha.grievanceportal.grievance.NewGrievance;
 import com.shubha.grievanceportal.identity.CurrentUser;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,12 +48,14 @@ class GrievanceController {
     private final GrievanceService grievances;
     private final GrievanceTransitionService transitions;
     private final GrievanceViewGate viewGate;
+    private final GrievanceTicketService tickets;
 
     GrievanceController(GrievanceService grievances, GrievanceTransitionService transitions,
-                        GrievanceViewGate viewGate) {
+                        GrievanceViewGate viewGate, GrievanceTicketService tickets) {
         this.grievances = grievances;
         this.transitions = transitions;
         this.viewGate = viewGate;
+        this.tickets = tickets;
     }
 
     record ReasonRequest(@Size(max = 1000) String reason) {
@@ -62,6 +68,10 @@ class GrievanceController {
     record HoldRequest(@NotNull HoldReasonType reasonType, @NotNull HoldOwnerType ownerType,
                        UUID holdOwnerId, @Size(max = 255) String holdOwnerNote,
                        @Size(max = 1000) String reason) {
+    }
+
+    // internal: absent means a comment everyone sees.
+    record CommentRequest(@NotBlank @Size(max = 2000) String body, Boolean internal) {
     }
 
     @PostMapping
@@ -107,6 +117,32 @@ class GrievanceController {
         return grievances.history(id).stream()
                 .map(c -> internal ? HistoryEntry.full(c) : HistoryEntry.forCitizen(c, actor.id()))
                 .toList();
+    }
+
+    /** The ticket page's header and side panel. Category named per Accept-Language. */
+    @GetMapping("/{id}/overview")
+    TicketOverview overview(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,
+                            @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+                            String acceptLanguage) {
+        viewGate.requireVisible(actor.id(), id);
+        return tickets.overview(id, actor.id(), acceptLanguage);
+    }
+
+    /** Comments and events, oldest first. Internal remarks and staff notes only for GRIEVANCE_VIEW_INTERNAL. */
+    @GetMapping("/{id}/activity")
+    List<ActivityItem> activity(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,
+                                @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+                                String acceptLanguage) {
+        viewGate.requireVisible(actor.id(), id);
+        return tickets.activity(id, actor.id(), acceptLanguage);
+    }
+
+    @PostMapping("/{id}/comments")
+    ResponseEntity<ActivityItem> comment(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,
+                                         @Valid @RequestBody CommentRequest body) {
+        viewGate.requireVisible(actor.id(), id);
+        ActivityItem created = tickets.comment(id, actor.id(), body.body(), Boolean.TRUE.equals(body.internal()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PostMapping("/{id}/acknowledge")

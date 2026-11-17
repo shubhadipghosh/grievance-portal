@@ -1,0 +1,331 @@
+<main>
+  <a class="back" [routerLink]="back().link">← {{ back().label }}</a>
+
+  @if (error(); as message) {
+    <div role="alert">
+      <p class="form-error">{{ message }}</p>
+      <button type="button" (click)="load()">Try again</button>
+    </div>
+  } @else if (overview(); as o) {
+    <header class="ticket-header">
+      <p class="ticket-meta">
+        <span class="ticket-no">{{ o.grievance.ticketNo }}</span>
+        <span class="badge" [attr.data-status]="o.grievance.status">{{
+          statusLabels[o.grievance.status]
+        }}</span>
+        @if (o.grievance.priority !== 'NORMAL') {
+          <span class="priority" [attr.data-priority]="o.grievance.priority">
+            {{ priorityLabels[o.grievance.priority] }} priority
+          </span>
+        }
+      </p>
+      <h1>{{ o.grievance.title }}</h1>
+    </header>
+
+    <div class="layout">
+      <div class="primary">
+        <section class="card" aria-labelledby="description-heading">
+          <h2 id="description-heading">Description</h2>
+          <p class="description">{{ o.grievance.description }}</p>
+          @if (o.grievance.addressText || o.grievance.latitude !== null) {
+            <p class="location">
+              <span class="label">Location</span>
+              {{ o.grievance.addressText }}
+              @if (o.grievance.latitude !== null && o.grievance.longitude !== null) {
+                <a
+                  [href]="
+                    'https://www.openstreetmap.org/?mlat=' +
+                    o.grievance.latitude +
+                    '&mlon=' +
+                    o.grievance.longitude +
+                    '#map=18/' +
+                    o.grievance.latitude +
+                    '/' +
+                    o.grievance.longitude
+                  "
+                  target="_blank"
+                  rel="noopener"
+                  >View on map<span class="visually-hidden"> (opens in a new tab)</span></a
+                >
+              }
+            </p>
+          }
+        </section>
+
+        @if (resolutionNote(); as note) {
+          <section class="resolution" aria-labelledby="resolution-heading">
+            <h2 id="resolution-heading">How it was resolved</h2>
+            <p>{{ note }}</p>
+          </section>
+        }
+
+        <section class="card" aria-labelledby="attachments-heading">
+          <h2 id="attachments-heading">Attachments</h2>
+          <p class="empty">No attachments yet.</p>
+        </section>
+
+        <section class="card activity" aria-labelledby="activity-heading">
+          <div class="activity-head">
+            <h2 id="activity-heading">Activity</h2>
+            <div class="filters" role="group" aria-label="Show">
+              <button
+                type="button"
+                class="chip"
+                [attr.aria-pressed]="filter() === 'ALL'"
+                (click)="filter.set('ALL')"
+              >
+                All
+              </button>
+              <button
+                type="button"
+                class="chip"
+                [attr.aria-pressed]="filter() === 'COMMENTS'"
+                (click)="filter.set('COMMENTS')"
+              >
+                Comments ({{ commentCount() }})
+              </button>
+              <button
+                type="button"
+                class="chip"
+                [attr.aria-pressed]="filter() === 'HISTORY'"
+                (click)="filter.set('HISTORY')"
+              >
+                History
+              </button>
+            </div>
+          </div>
+
+          @if (o.canComment) {
+            <form class="composer" [class.internal]="internalDraft()" (submit)="post($event)">
+              @if (o.canCommentInternal) {
+                <div class="modes" role="group" aria-label="Comment type">
+                  <button
+                    type="button"
+                    class="mode"
+                    [attr.aria-pressed]="!internalDraft()"
+                    (click)="setInternal(false)"
+                  >
+                    Comment
+                  </button>
+                  <button
+                    type="button"
+                    class="mode"
+                    [attr.aria-pressed]="internalDraft()"
+                    (click)="setInternal(true)"
+                  >
+                    Internal remark
+                  </button>
+                </div>
+              }
+              <label for="comment-body" class="visually-hidden">
+                {{ internalDraft() ? 'Internal remark' : 'Comment' }}
+              </label>
+              <textarea
+                id="comment-body"
+                rows="3"
+                [formField]="commentForm.body"
+                [placeholder]="
+                  internalDraft()
+                    ? 'Visible to department staff only'
+                    : 'Write a comment. Everyone on this grievance can see it.'
+                "
+                aria-describedby="comment-hint"
+              ></textarea>
+              <div class="composer-foot">
+                <p id="comment-hint" class="hint">
+                  @if (internalDraft()) {
+                    <span class="lock" aria-hidden="true">🔒</span> Hidden from the citizen ·
+                  }
+                  <span [class.over]="draftLength() > maxComment"
+                    >{{ draftLength() }}/{{ maxComment }}</span
+                  >
+                </p>
+                <button type="submit" [disabled]="!canPost()">
+                  {{ posting() ? 'Posting…' : internalDraft() ? 'Add remark' : 'Comment' }}
+                </button>
+              </div>
+              @if (postError(); as message) {
+                <p class="form-error" role="alert">{{ message }}</p>
+              }
+            </form>
+          }
+
+          @if (feed().length === 0) {
+            <p class="empty">
+              {{ filter() === 'COMMENTS' ? 'No comments yet.' : 'Nothing here yet.' }}
+            </p>
+          } @else {
+            <ol class="feed">
+              @for (item of feed(); track $index) {
+                @switch (item.kind) {
+                  @case ('COMMENT') {
+                    <li class="comment" [class.internal]="item.internal">
+                      <span class="avatar" aria-hidden="true">{{ initials(item.actorName) }}</span>
+                      <div class="bubble">
+                        <p class="byline">
+                          <strong>{{ actor(item) }}</strong>
+                          @if (item.actorType === 'CITIZEN') {
+                            <span class="role">Citizen</span>
+                          }
+                          @if (item.internal) {
+                            <span class="internal-tag">Internal</span>
+                          }
+                          <time [attr.datetime]="item.at">{{
+                            item.at | date: istFormat : istZone
+                          }}</time>
+                        </p>
+                        <p class="body">{{ item.body }}</p>
+                      </div>
+                    </li>
+                  }
+                  @default {
+                    <li class="event" [attr.data-kind]="item.kind">
+                      <span class="dot" aria-hidden="true"></span>
+                      <div>
+                        <p class="what">
+                          <strong>{{ actor(item) }}</strong>
+                          @switch (item.kind) {
+                            @case ('STATUS') {
+                              @if (item.fromStatus === null) {
+                                raised this grievance
+                              } @else {
+                                changed status
+                                <span class="badge" [attr.data-status]="item.fromStatus">{{
+                                  statusLabels[item.fromStatus]
+                                }}</span>
+                                <span aria-label="to">→</span>
+                                <span class="badge" [attr.data-status]="item.toStatus">{{
+                                  statusLabels[item.toStatus!]
+                                }}</span>
+                                @if (item.holdReasonType; as hold) {
+                                  · {{ holdReasonLabels[hold] }}
+                                }
+                              }
+                            }
+                            @case ('ASSIGNMENT') {
+                              @if (item.previousAssigneeName; as previous) {
+                                changed the assignee from <strong>{{ previous }}</strong> to
+                                <strong>{{ item.assigneeName }}</strong>
+                              } @else {
+                                assigned this to <strong>{{ item.assigneeName }}</strong>
+                              }
+                            }
+                            @case ('REROUTE') {
+                              @if (item.toDepartment) {
+                                moved this from <strong>{{ item.fromDepartment }}</strong> to
+                                <strong>{{ item.toDepartment }}</strong>
+                              }
+                              @if (item.toCategory) {
+                                {{ item.toDepartment ? 'and' : '' }} changed the category from
+                                <strong>{{ item.fromCategory ?? 'unnamed' }}</strong> to
+                                <strong>{{ item.toCategory }}</strong>
+                              }
+                            }
+                          }
+                        </p>
+                        <p class="when">
+                          <time [attr.datetime]="item.at">{{
+                            item.at | date: istFormat : istZone
+                          }}</time>
+                        </p>
+                        @if (item.reason) {
+                          <p class="note">{{ item.reason }}</p>
+                        }
+                      </div>
+                    </li>
+                  }
+                }
+              }
+            </ol>
+          }
+        </section>
+      </div>
+
+      <aside class="card details" aria-labelledby="details-heading">
+        <h2 id="details-heading">Details</h2>
+        <dl>
+          <div>
+            <dt>Status</dt>
+            <dd>
+              <span class="badge" [attr.data-status]="o.grievance.status">{{
+                statusLabels[o.grievance.status]
+              }}</span>
+              @if (o.grievance.holdReasonType; as hold) {
+                <span class="sub">{{ holdReasonLabels[hold] }}</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Assignee</dt>
+            <dd>
+              @if (o.assigneeName; as name) {
+                <span class="person">
+                  <span class="avatar small" aria-hidden="true">{{ initials(name) }}</span>
+                  {{ name }}
+                </span>
+              } @else {
+                <span class="muted">Unassigned</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Department</dt>
+            <dd>{{ o.departmentName }}</dd>
+          </div>
+          <div>
+            <dt>Department admin</dt>
+            <dd>
+              @for (name of o.departmentAdmins; track name) {
+                <span class="person">
+                  <span class="avatar small" aria-hidden="true">{{ initials(name) }}</span>
+                  {{ name }}
+                </span>
+              } @empty {
+                <span class="muted">None assigned</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Ward</dt>
+            <dd>{{ o.wardName }}</dd>
+          </div>
+          <div>
+            <dt>Category</dt>
+            <dd>{{ o.categoryName ?? '—' }}</dd>
+          </div>
+          <div>
+            <dt>Raised by</dt>
+            <dd>{{ isCitizen() ? 'You' : (o.reporterName ?? 'Citizen') }}</dd>
+          </div>
+          <div>
+            <dt>Raised on</dt>
+            <dd>{{ o.grievance.submittedAt | date: istFormat : istZone }}</dd>
+          </div>
+          <div>
+            <dt>Proposed resolution by</dt>
+            <dd>
+              {{ o.grievance.slaDueAt | date: istFormat : istZone }}
+              @if (sla(); as s) {
+                <span class="sla" [class.overdue]="s.overdue">{{ s.text }}</span>
+              }
+            </dd>
+          </div>
+          @if (o.grievance.resolvedAt) {
+            <div>
+              <dt>Resolved on</dt>
+              <dd>{{ o.grievance.resolvedAt | date: istFormat : istZone }}</dd>
+            </div>
+          }
+          @if (o.grievance.closedAt) {
+            <div>
+              <dt>Closed on</dt>
+              <dd>{{ o.grievance.closedAt | date: istFormat : istZone }}</dd>
+            </div>
+          }
+        </dl>
+      </aside>
+    </div>
+  } @else {
+    <p role="status">Loading…</p>
+  }
+</main>

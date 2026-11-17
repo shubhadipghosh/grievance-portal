@@ -60,11 +60,7 @@ export interface GrievanceSummary {
 
 /** grievance.HoldReasonType */
 export type HoldReasonType =
-  | 'AWAITING_CITIZEN'
-  | 'AWAITING_CONTRACTOR'
-  | 'AWAITING_DEPARTMENT'
-  | 'AWAITING_BUDGET'
-  | 'OTHER';
+  'AWAITING_CITIZEN' | 'AWAITING_CONTRACTOR' | 'AWAITING_DEPARTMENT' | 'AWAITING_BUDGET' | 'OTHER';
 
 /** grievance.HoldOwnerType */
 export type HoldOwnerType = 'CITIZEN' | 'STAFF' | 'EXTERNAL';
@@ -121,20 +117,64 @@ export interface CitizenGrievanceSummary {
 }
 
 /**
- * grievance.internal.HistoryEntry: one status change. In the citizen view
- * actorName is always null, and reason is withheld except where it was
- * written for the citizen (STATE_MACHINE.md, "What citizens see").
+ * grievance.internal.TicketOverview: the ticket page's header and side panel.
+ * departmentAdmins are the DEPT_ADMINs whose scope covers the grievance.
  */
-export interface HistoryEntry {
-  /** Null on the initial SUBMITTED entry. */
-  fromStatus: GrievanceStatus | null;
-  toStatus: GrievanceStatus;
-  occurredAt: string;
+export interface TicketOverview {
+  grievance: GrievanceDetails;
+  /** In the browser's language; null if the category has no translation. */
+  categoryName: string | null;
+  departmentName: string;
+  wardName: string;
+  /** Null for a citizen who has not given a name. */
+  reporterName: string | null;
+  /** Null while unassigned. */
+  assigneeName: string | null;
+  departmentAdmins: string[];
+  /** May post a comment everyone sees. */
+  canComment: boolean;
+  /** May post an internal remark: staff only. */
+  canCommentInternal: boolean;
+}
+
+/** grievance.internal.ActivityItem.Kind */
+export type ActivityKind = 'COMMENT' | 'STATUS' | 'ASSIGNMENT' | 'REROUTE';
+
+/**
+ * grievance.internal.ActivityItem: a comment or an event. Fields that do not
+ * apply to the kind are null. Staff notes (reason) and internal remarks are
+ * only sent to staff.
+ */
+export interface ActivityItem {
+  kind: ActivityKind;
+  at: string;
   actorType: UserType;
+  /** Null only for a citizen who has not given a name. */
   actorName: string | null;
-  reason: string | null;
-  /** Set only on ON_HOLD entries. */
+  /** COMMENT */
+  body: string | null;
+  /** COMMENT: an internal remark, never sent to a citizen. */
+  internal: boolean | null;
+  /** STATUS. Null fromStatus is the filing. */
+  fromStatus: GrievanceStatus | null;
+  toStatus: GrievanceStatus | null;
   holdReasonType: HoldReasonType | null;
+  /** STATUS, ASSIGNMENT, REROUTE */
+  reason: string | null;
+  /** ASSIGNMENT. previousAssigneeName is null on the first assignment. */
+  assigneeName: string | null;
+  previousAssigneeName: string | null;
+  /** REROUTE. Each pair is null when that one did not change. */
+  fromDepartment: string | null;
+  toDepartment: string | null;
+  fromCategory: string | null;
+  toCategory: string | null;
+}
+
+/** GrievanceController.CommentRequest. body: max 2000. */
+export interface NewComment {
+  body: string;
+  internal: boolean;
 }
 
 /** organization.DepartmentSummary */

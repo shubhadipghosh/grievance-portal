@@ -29,9 +29,7 @@ export const routes: Routes = [
     path: 'citizen/grievances/:id',
     canActivate: [citizenGuard],
     loadComponent: () =>
-      import('./features/citizen/citizen-grievance/citizen-grievance').then(
-        (m) => m.CitizenGrievance,
-      ),
+      import('./features/grievances/grievance-detail').then((m) => m.GrievanceDetail),
   },
   {
     path: 'queue',
@@ -44,7 +42,7 @@ export const routes: Routes = [
     loadComponent: () => import('./features/profile/profile').then((m) => m.Profile),
   },
   {
-    // Citizens will view their own grievances here too; the backend decides which.
+    // The same ticket page as citizen/grievances/:id; the backend decides what each viewer sees.
     path: 'grievances/:id',
     canActivate: [authGuard],
     loadComponent: () =>

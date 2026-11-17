@@ -153,12 +153,18 @@ class GrievanceHistoryApiTest {
     // ---------------------------------------------------------------- citizen view
 
     @Test
-    void citizenNeverSeesStaffNotesOrNames() throws Exception {
+    void citizenNeverSeesStaffNotes() throws Exception {
         String body = history(resolvedAfterAHold(), citizen);
 
-        assertThat(body).doesNotContain(ACK_NOTE, ASSIGN_NOTE, HOLD_NOTE, "Ganguly", "Ravi Sen", "Sanitation Admin");
-        List<Object> names = JsonPath.read(body, "$[*].actorName");
-        assertThat(names).hasSize(7).containsOnlyNulls();
+        assertThat(body).doesNotContain(ACK_NOTE, ASSIGN_NOTE, HOLD_NOTE, "Ganguly");
+    }
+
+    // Rule 1, reversed by the stakeholder on 2026-11-17.
+    @Test
+    void citizenSeesWhoActed() throws Exception {
+        List<String> names = JsonPath.read(history(resolvedAfterAHold(), citizen), "$[*].actorName");
+        assertThat(names).containsExactly("Asha Das", "Sanitation Admin", "Sanitation Admin", "Ravi Sen",
+                "Sanitation Admin", "Sanitation Admin", "Ravi Sen");
     }
 
     @Test
