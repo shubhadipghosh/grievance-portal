@@ -9,6 +9,8 @@ import com.shubha.grievanceportal.organization.Department;
 import com.shubha.grievanceportal.organization.Ward;
 import org.hibernate.Hibernate;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
@@ -168,7 +170,8 @@ class IdentityRepositoriesTest {
 
     UserRoleGrant activeGrant() {
         AppUser officer = users.save(AppUser.staff("Officer", null, "{bcrypt}x"));
-        Role role = roles.findByCode("FIELD_OFFICER").orElseThrow();
+        // AUDITOR: the one role trg_grant_scope lets go unscoped without being an admin.
+        Role role = roles.findByCode("AUDITOR").orElseThrow();
         return grants.saveAndFlush(new UserRoleGrant(officer, role, null, null, null));
     }
 
@@ -217,6 +220,43 @@ class IdentityRepositoriesTest {
         // uq_active_grant COALESCEs NULL scopes, so this must collide.
         assertThatThrownBy(() -> grants.saveAndFlush(new UserRoleGrant(admin, superAdmin, null, null, null)))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    // ---------------------------------------------------------------- trg_grant_scope
+
+    // One case per test: a rejected insert aborts the transaction.
+    @ParameterizedTest
+    @CsvSource({
+            "FIELD_OFFICER, false, false",
+            "FIELD_OFFICER, true,  false",
+            "DEPT_ADMIN,    false, false",
+            "DEPT_ADMIN,    true,  true",
+            "SUPER_ADMIN,   true,  false",
+    })
+    void grantOutsideItsRolesScopeIsRejected(String roleCode, boolean withDepartment, boolean withWard) {
+        AppUser officer = users.save(AppUser.staff("Officer", null, "{bcrypt}x"));
+        Department dept = withDepartment ? em.persist(new Department("TEST_SANITATION", "Sanitation")) : null;
+        Ward ward = withWard ? em.persist(new Ward("W12", "Ward 12")) : null;
+        Role role = roles.findByCode(roleCode).orElseThrow();
+
+        assertThatThrownBy(() -> grants.saveAndFlush(new UserRoleGrant(officer, role, dept, ward, null)))
+                .rootCause().hasMessageContaining("role " + roleCode + " needs");
+    }
+
+    @Test
+    void secondDepartmentIsRejected() {
+        AppUser officer = users.save(AppUser.staff("Officer", null, "{bcrypt}x"));
+        Department sanitation = em.persist(new Department("TEST_SANITATION", "Sanitation"));
+        Department water = em.persist(new Department("TEST_WATER", "Water"));
+        Ward ward = em.persist(new Ward("W12", "Ward 12"));
+        Role fieldOfficer = roles.findByCode("FIELD_OFFICER").orElseThrow();
+        Role deptAdmin = roles.findByCode("DEPT_ADMIN").orElseThrow();
+        grants.saveAndFlush(new UserRoleGrant(officer, fieldOfficer, sanitation, ward, null));
+
+        // Same department in another role is fine; another department is not.
+        grants.saveAndFlush(new UserRoleGrant(officer, deptAdmin, sanitation, null, null));
+        assertThatThrownBy(() -> grants.saveAndFlush(new UserRoleGrant(officer, fieldOfficer, water, ward, null)))
+                .rootCause().hasMessageContaining("already belongs to department");
     }
 
     @Test

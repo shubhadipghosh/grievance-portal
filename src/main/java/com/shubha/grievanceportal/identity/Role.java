@@ -2,6 +2,8 @@ package com.shubha.grievanceportal.identity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -30,6 +32,28 @@ public class Role {
     @Column(name = "description")
     private String description;
 
+    // Set by migration, enforced by trg_grant_scope.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "department_scope", nullable = false, insertable = false, updatable = false)
+    private ScopeRule departmentScope;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ward_scope", nullable = false, insertable = false, updatable = false)
+    private ScopeRule wardScope;
+
+    /** Whether a grant of this role must, must not, or may set an axis. */
+    public enum ScopeRule {
+        REQUIRED, FORBIDDEN, OPTIONAL;
+
+        public boolean allows(boolean set) {
+            return switch (this) {
+                case REQUIRED -> set;
+                case FORBIDDEN -> !set;
+                case OPTIONAL -> true;
+            };
+        }
+    }
+
     protected Role() {
     }
 
@@ -52,6 +76,14 @@ public class Role {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public ScopeRule getDepartmentScope() {
+        return departmentScope;
+    }
+
+    public ScopeRule getWardScope() {
+        return wardScope;
     }
 
     @Override

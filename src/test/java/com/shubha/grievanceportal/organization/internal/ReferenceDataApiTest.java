@@ -155,8 +155,11 @@ class ReferenceDataApiTest {
 
     @Test
     void inactiveDepartmentsAreNeverListed() throws Exception {
-        grant(officer, "FIELD_OFFICER", closedDept, w12);
-        assertThat(list("/api/v1/departments", officer)).isEqualTo(ids(sanitation.getId()));
+        // Staff belong to one department (trg_grant_scope), so a separate officer.
+        AppUser closedOfficer = persist(AppUser.staff("Closed Dept Officer", null, "{bcrypt}x"));
+        em.flush();
+        grant(closedOfficer, "FIELD_OFFICER", closedDept, w12);
+        assertThat(list("/api/v1/departments", closedOfficer)).isEmpty();
         assertThat(list("/api/v1/departments", superAdmin)).doesNotContain(closedDept.getId().toString());
     }
 

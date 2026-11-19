@@ -307,9 +307,65 @@ class AdminApiTest {
     void unknownRoleOrScopeIs422() throws Exception {
         expectProblem(grantRole(superAdmin, officer.getId(), "{\"roleCode\": \"MAYOR\"}"), 422);
         expectProblem(grantRole(superAdmin, officer.getId(), """
-                {"roleCode": "FIELD_OFFICER", "departmentId": "%s"}""".formatted(UUID.randomUUID())), 422);
+                {"roleCode": "FIELD_OFFICER", "departmentId": "%s", "wardId": "%s"}"""
+                .formatted(UUID.randomUUID(), w12.getId())), 422);
         expectProblem(grantRole(superAdmin, officer.getId(), """
-                {"roleCode": "FIELD_OFFICER", "wardId": "%s"}""".formatted(UUID.randomUUID())), 422);
+                {"roleCode": "FIELD_OFFICER", "departmentId": "%s", "wardId": "%s"}"""
+                .formatted(sanitation.getId(), UUID.randomUUID())), 422);
+    }
+
+    @Test
+    void scopeTheRoleDoesNotAllowIs422() throws Exception {
+        // A missing axis would mean "everywhere": the gap these rules close.
+        expectProblem(grantRole(superAdmin, officer.getId(), "{\"roleCode\": \"DEPT_ADMIN\"}"), 422);
+        expectProblem(grantRole(superAdmin, officer.getId(), """
+                {"roleCode": "FIELD_OFFICER", "departmentId": "%s"}""".formatted(sanitation.getId())), 422);
+        expectProblem(grantRole(superAdmin, officer.getId(), """
+                {"roleCode": "DEPT_ADMIN", "departmentId": "%s", "wardId": "%s"}"""
+                .formatted(sanitation.getId(), w12.getId())), 422);
+        expectProblem(grantRole(superAdmin, officer.getId(), """
+                {"roleCode": "SUPER_ADMIN", "departmentId": "%s"}""".formatted(sanitation.getId())), 422);
+        assertThat(activeGrantCount(officer)).isZero();
+    }
+
+    @Test
+    void staffBelongToOneDepartment() throws Exception {
+        grantOfficer();
+        Department water = persist(new Department("TEST_WATER", "Water"));
+        Ward w7 = persist(new Ward("W7", "Ward 7"));
+        em.flush();
+
+        // Another ward in the same department is fine.
+        grantRole(superAdmin, officer.getId(), """
+                {"roleCode": "FIELD_OFFICER", "departmentId": "%s", "wardId": "%s"}"""
+                .formatted(sanitation.getId(), w7.getId()))
+                .andExpect(status().isCreated());
+        // Another department is not, in any role.
+        expectProblem(grantRole(superAdmin, officer.getId(), """
+                {"roleCode": "FIELD_OFFICER", "departmentId": "%s", "wardId": "%s"}"""
+                .formatted(water.getId(), w12.getId())), 422);
+        expectProblem(grantRole(superAdmin, deptAdmin.getId(), """
+                {"roleCode": "DEPT_ADMIN", "departmentId": "%s"}""".formatted(water.getId())), 422);
+        assertThat(activeGrantCount(officer)).isEqualTo(2);
+    }
+
+    @Test
+    void revokingFreesTheUserToMoveDepartment() throws Exception {
+        String grantId = grantOfficer();
+        Department water = persist(new Department("TEST_WATER", "Water"));
+        em.flush();
+        revoke(superAdmin, officer.getId(), grantId, "{\"reason\": \"Transferred to Water\"}");
+
+        grantRole(superAdmin, officer.getId(), """
+                {"roleCode": "FIELD_OFFICER", "departmentId": "%s", "wardId": "%s"}"""
+                .formatted(water.getId(), w12.getId()))
+                .andExpect(status().isCreated());
+    }
+
+    long activeGrantCount(AppUser user) {
+        return ((Number) em.createNativeQuery(
+                        "select count(*) from user_role_grant where user_id = ?1 and revoked_at is null")
+                .setParameter(1, user.getId()).getSingleResult()).longValue();
     }
 
     @Test

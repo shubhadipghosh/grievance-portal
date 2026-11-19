@@ -168,7 +168,8 @@ class StaffAdminService {
     /**
      * @param departmentId null = every department
      * @param wardId       null = every ward
-     * @throws InvalidReferenceException not a staff account; unknown role, department or ward; the SYSTEM role
+     * @throws InvalidReferenceException not a staff account; unknown role, department or ward; the SYSTEM role;
+     *                                   a scope the role does not allow; a department other than the user's own
      * @throws AlreadyExistsException    the user already holds this role in this scope
      */
     GrantView grant(UUID actorId, UUID userId, String roleCode, UUID departmentId, UUID wardId) {
@@ -183,6 +184,23 @@ class StaffAdminService {
                 .orElseThrow(() -> new InvalidReferenceException("No grantable role " + roleCode));
         Department department = departmentId == null ? null : find(Department.class, departmentId, "department");
         Ward ward = wardId == null ? null : find(Ward.class, wardId, "ward");
+        // trg_grant_scope enforces both rules below; checked here for a readable 422.
+        if (!role.getDepartmentScope().allows(department != null) || !role.getWardScope().allows(ward != null)) {
+            throw new InvalidReferenceException(roleCode + " needs department " + role.getDepartmentScope()
+                    + ", ward " + role.getWardScope());
+        }
+        if (department != null) {
+            // Serializes grants to this user, so a concurrent grant in another department waits for this one.
+            users.findForUpdate(userId);
+            grants.findByUserIdAndRevokedAtIsNull(userId).stream()
+                    .map(UserRoleGrant::getDepartment)
+                    .filter(d -> d != null && !d.getId().equals(department.getId()))
+                    .findFirst()
+                    .ifPresent(d -> {
+                        throw new InvalidReferenceException("The user already belongs to " + d.getName()
+                                + "; revoke those grants first");
+                    });
+        }
 
         UserRoleGrant grant = new UserRoleGrant(user, role, department, ward, users.getReferenceById(actorId));
         try {

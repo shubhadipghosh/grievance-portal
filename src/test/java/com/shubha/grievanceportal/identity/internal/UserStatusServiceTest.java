@@ -198,16 +198,14 @@ class UserStatusServiceTest {
 
     @Test
     void actorWithoutUnscopedUserSuspendIsRejected() {
-        // DEPT_ADMIN does not hold USER_SUSPEND, even unscoped.
+        // DEPT_ADMIN does not hold USER_SUSPEND. (A department-scoped SUPER_ADMIN
+        // grant would not reach municipality-wide either, but trg_grant_scope forbids one.)
         AppUser deptAdmin = staff();
-        grant(deptAdmin, "DEPT_ADMIN", null);
-        // SUPER_ADMIN holds it, but a department-scoped grant does not reach municipality-wide.
-        AppUser scopedSuperAdmin = staff();
-        grant(scopedSuperAdmin, "SUPER_ADMIN", department());
+        grant(deptAdmin, "DEPT_ADMIN", department());
         AppUser noGrants = staff();
         AppUser citizen = citizen();
 
-        for (AppUser actor : new AppUser[] {deptAdmin, scopedSuperAdmin, noGrants, citizen}) {
+        for (AppUser actor : new AppUser[] {deptAdmin, noGrants, citizen}) {
             assertRejected(target.getId(), LOCKED, actor.getId(), "Reason", NotAuthorizedException.class);
         }
     }
