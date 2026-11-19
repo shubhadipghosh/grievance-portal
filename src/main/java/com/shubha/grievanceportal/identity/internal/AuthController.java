@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Login and session endpoints. A login stores a {@link CurrentUser} in the
@@ -48,12 +49,15 @@ class AuthController {
 
     private final OtpService otp;
     private final StaffLoginService staffLogin;
+    private final PasswordChangeService passwordChange;
     private final CsrfTokenRepository csrfTokens;
     private final SecurityContextRepository securityContexts = new HttpSessionSecurityContextRepository();
 
-    AuthController(OtpService otp, StaffLoginService staffLogin, CsrfTokenRepository csrfTokens) {
+    AuthController(OtpService otp, StaffLoginService staffLogin, PasswordChangeService passwordChange,
+                   CsrfTokenRepository csrfTokens) {
         this.otp = otp;
         this.staffLogin = staffLogin;
+        this.passwordChange = passwordChange;
         this.csrfTokens = csrfTokens;
     }
 
@@ -65,6 +69,18 @@ class AuthController {
 
     // app_user.email is VARCHAR(255).
     record StaffLoginRequest(@NotBlank @Size(max = 255) String email, @NotBlank String password) {
+    }
+
+    // BCrypt reads at most 72 bytes; a longer password would be silently truncated.
+    record PasswordChangeRequest(@NotBlank String currentPassword,
+                                 @NotBlank @Size(min = 12, max = 72) String newPassword) {
+    }
+
+    /**
+     * The signed-in user, and whether they must change their password before
+     * anything else (PasswordChangeFilter refuses every other endpoint until then).
+     */
+    record SignedIn(UUID id, UserType type, boolean mustChangePassword) {
     }
 
     @PostMapping("/otp/send")
@@ -89,11 +105,17 @@ class AuthController {
     }
 
     @PostMapping("/staff/login")
-    CurrentUser staffLogin(@Valid @RequestBody StaffLoginRequest body, HttpServletRequest request,
-                           HttpServletResponse response) {
+    SignedIn staffLogin(@Valid @RequestBody StaffLoginRequest body, HttpServletRequest request,
+                        HttpServletResponse response) {
         return switch (staffLogin.login(body.email(), body.password())) {
-            case StaffLoginService.Result.Authenticated authenticated ->
-                    establishSession(new CurrentUser(authenticated.userId(), UserType.STAFF), request, response);
+            case StaffLoginService.Result.Authenticated authenticated -> {
+                CurrentUser user = establishSession(new CurrentUser(authenticated.userId(), UserType.STAFF),
+                        request, response);
+                if (authenticated.mustChangePassword()) {
+                    request.getSession().setAttribute(PasswordChangeFilter.MUST_CHANGE_PASSWORD, true);
+                }
+                yield new SignedIn(user.id(), user.type(), authenticated.mustChangePassword());
+            }
             case StaffLoginService.Result.Failed _ -> throw new BadCredentialsException("Staff login failed");
             case StaffLoginService.Result.RateLimited limited -> throw new RateLimitedException(limited.retryAfter());
         };
@@ -101,8 +123,18 @@ class AuthController {
 
     /** 401 without a session: SecurityConfig requires authentication here. */
     @GetMapping("/me")
-    CurrentUser me(@AuthenticationPrincipal CurrentUser user) {
-        return user;
+    SignedIn me(@AuthenticationPrincipal CurrentUser user, HttpSession session) {
+        return new SignedIn(user.id(), user.type(),
+                session.getAttribute(PasswordChangeFilter.MUST_CHANGE_PASSWORD) != null);
+    }
+
+    /** Staff only. Keeps this session and ends the user's others. */
+    @PostMapping("/password")
+    ResponseEntity<Void> changePassword(@AuthenticationPrincipal CurrentUser user,
+                                        @Valid @RequestBody PasswordChangeRequest body, HttpSession session) {
+        passwordChange.change(user.id(), body.currentPassword(), body.newPassword(), session.getId());
+        session.removeAttribute(PasswordChangeFilter.MUST_CHANGE_PASSWORD);
+        return ResponseEntity.noContent().build();
     }
 
     private CurrentUser establishSession(CurrentUser user, HttpServletRequest request, HttpServletResponse response) {

@@ -167,7 +167,7 @@ class ReferenceDataApiTest {
 
     @Test
     void revokedGrantsDoNotCount() throws Exception {
-        em.createNativeQuery("update user_role_grant set revoked_at = now() where user_id = ?1")
+        em.createNativeQuery("update user_role_grant set revoked_at = now(), revoked_by = user_id, revoke_reason = 'test' where user_id = ?1")
                 .setParameter(1, officer.getId())
                 .executeUpdate();
         assertThat(list("/api/v1/departments", officer)).isEmpty();

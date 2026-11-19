@@ -1,16 +1,35 @@
 package com.shubha.grievanceportal.identity.internal;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface UserRoleGrantRepository extends JpaRepository<UserRoleGrant, UUID> {
 
     List<UserRoleGrant> findByUserIdAndRevokedAtIsNull(UUID userId);
+
+    @Query("""
+            select g from UserRoleGrant g
+            join fetch g.role
+            left join fetch g.department
+            left join fetch g.ward
+            left join fetch g.grantedBy
+            left join fetch g.revokedBy
+            where g.user.id = :userId
+            order by g.grantedAt, g.id""")
+    List<UserRoleGrant> findWithDetailsByUserId(UUID userId);
+
+    /** Row-locked, so two concurrent revocations cannot both pass the already-revoked check. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select g from UserRoleGrant g join fetch g.user where g.id = :id")
+    Optional<UserRoleGrant> findForUpdate(UUID id);
 
     // Suspension is reversible, so it gates on user status rather than revoking grants.
     // Native: a JPQL path through the nullable department/ward associations

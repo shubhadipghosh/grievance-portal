@@ -41,6 +41,10 @@ public class AppUser {
     @Column(name = "password_hash")
     private String passwordHash;
 
+    // Set with an admin-generated password; cleared when the user picks their own.
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
+
     // Nullable for citizens only (staff_needs_name): auto-registration has no name yet.
     @Column(name = "full_name", length = 150)
     private String fullName;
@@ -134,6 +138,22 @@ public class AppUser {
             Objects.requireNonNull(passwordHash, "staff passwordHash");
         }
         this.passwordHash = passwordHash;
+    }
+
+    public boolean isMustChangePassword() {
+        return mustChangePassword;
+    }
+
+    /** A password an admin generated: the user must replace it before doing anything else. */
+    public void setTemporaryPassword(String passwordHash) {
+        setPasswordHash(passwordHash);
+        this.mustChangePassword = true;
+    }
+
+    /** A password the user chose themselves. */
+    public void setChosenPassword(String passwordHash) {
+        setPasswordHash(passwordHash);
+        this.mustChangePassword = false;
     }
 
     public String getFullName() {

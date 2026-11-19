@@ -73,7 +73,7 @@ class SecurityConfig {
                 resolver.resolveException(request, response, null, e);
 
         http.authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/me").authenticated()
+                        .requestMatchers("/api/v1/auth/me", "/api/v1/auth/password").authenticated()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // Load balancers and uptime monitors probe without a session. Status only:
                         // show-details and show-components stay at their default, never.

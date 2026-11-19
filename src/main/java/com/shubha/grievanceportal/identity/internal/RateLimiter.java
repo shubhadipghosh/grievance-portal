@@ -12,7 +12,8 @@ import java.util.Optional;
 /**
  * Counters in rate_limit over fixed windows aligned to the epoch
  * (the daily window starts at 00:00 UTC). Runs in the caller's transaction.
- * PHONE and IP count OTP sends; STAFF_LOGIN counts failed staff logins per email.
+ * PHONE and IP count OTP sends; STAFF_LOGIN counts failed staff logins per email,
+ * and wrong current passwords on a password change (PasswordChangeService).
  */
 @Component
 class RateLimiter {

@@ -102,7 +102,7 @@ class GrievanceAuthorizationTest {
 
     void revokeAllGrants(AppUser user) {
         em.getEntityManager()
-                .createNativeQuery("update user_role_grant set revoked_at = now() where user_id = ?1")
+                .createNativeQuery("update user_role_grant set revoked_at = now(), revoked_by = user_id, revoke_reason = 'test' where user_id = ?1")
                 .setParameter(1, user.getId())
                 .executeUpdate();
     }

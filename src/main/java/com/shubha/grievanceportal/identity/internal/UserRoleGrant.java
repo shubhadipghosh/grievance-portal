@@ -58,6 +58,13 @@ public class UserRoleGrant {
     @Column(name = "revoked_at")
     private OffsetDateTime revokedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "revoked_by")
+    private AppUser revokedBy;
+
+    @Column(name = "revoke_reason", length = 1000)
+    private String revokeReason;
+
     protected UserRoleGrant() {
     }
 
@@ -106,15 +113,26 @@ public class UserRoleGrant {
         return revokedAt;
     }
 
+    public AppUser getRevokedBy() {
+        return revokedBy;
+    }
+
+    public String getRevokeReason() {
+        return revokeReason;
+    }
+
     public boolean isActive() {
         return revokedAt == null;
     }
 
-    public void revoke(OffsetDateTime at) {
+    /** Once only; the DB trigger trg_grant_revoke_only refuses any other change. */
+    public void revoke(OffsetDateTime at, AppUser by, String reason) {
         if (revokedAt != null) {
             throw new IllegalStateException("Grant " + id + " already revoked");
         }
         this.revokedAt = Objects.requireNonNull(at, "at");
+        this.revokedBy = Objects.requireNonNull(by, "by");
+        this.revokeReason = Objects.requireNonNull(reason, "reason");
     }
 
     @Override

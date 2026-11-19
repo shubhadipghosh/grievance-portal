@@ -97,7 +97,7 @@ class IdentityRepositoriesTest {
                 .map(Method::getName)
                 .filter(name -> name.startsWith("set")))
                 .containsExactlyInAnyOrder("setPhone", "setEmail", "setPasswordHash", "setFullName",
-                        "setPreferredLocale");
+                        "setPreferredLocale", "setTemporaryPassword", "setChosenPassword");
     }
 
     @Test
@@ -159,9 +159,53 @@ class IdentityRepositoriesTest {
         assertThat(loaded.getWard().getId()).isEqualTo(ward.getId());
         assertThat(loaded.getGrantedBy()).isEqualTo(admin);
 
-        loaded.revoke(OffsetDateTime.now());
+        loaded.revoke(OffsetDateTime.now(), admin, "Moved to another ward");
         em.flush();
         assertThat(grants.findByUserIdAndRevokedAtIsNull(officer.getId())).isEmpty();
+    }
+
+    // ---------------------------------------------------------------- trg_grant_revoke_only
+
+    UserRoleGrant activeGrant() {
+        AppUser officer = users.save(AppUser.staff("Officer", null, "{bcrypt}x"));
+        Role role = roles.findByCode("FIELD_OFFICER").orElseThrow();
+        return grants.saveAndFlush(new UserRoleGrant(officer, role, null, null, null));
+    }
+
+    void sql(String statement, UserRoleGrant grant) {
+        em.getEntityManager().createNativeQuery(statement).setParameter(1, grant.getId()).executeUpdate();
+    }
+
+    @Test
+    void grantCannotBeDeleted() {
+        UserRoleGrant grant = activeGrant();
+        assertThatThrownBy(() -> sql("delete from user_role_grant where id = ?1", grant))
+                .rootCause().hasMessageContaining("cannot be deleted");
+    }
+
+    @Test
+    void activeGrantCannotBeRescoped() {
+        UserRoleGrant grant = activeGrant();
+        assertThatThrownBy(() -> sql("""
+                update user_role_grant set department_id = (select id from department limit 1)
+                where id = ?1""", grant))
+                .rootCause().hasMessageContaining("can only be revoked");
+    }
+
+    @Test
+    void revokedGrantCannotBeChangedAgain() {
+        UserRoleGrant grant = activeGrant();
+        sql("update user_role_grant set revoked_at = now(), revoked_by = user_id, revoke_reason = 'moved' where id = ?1",
+                grant);
+        assertThatThrownBy(() -> sql("update user_role_grant set revoke_reason = 'edited' where id = ?1", grant))
+                .rootCause().hasMessageContaining("can only be revoked");
+    }
+
+    @Test
+    void revocationNeedsWhoAndWhy() {
+        UserRoleGrant grant = activeGrant();
+        assertThatThrownBy(() -> sql("update user_role_grant set revoked_at = now() where id = ?1", grant))
+                .rootCause().hasMessageContaining("grant_revocation_complete");
     }
 
     @Test

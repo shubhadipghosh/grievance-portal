@@ -70,6 +70,16 @@ public class UserStatusHistory {
         this.reason = Objects.requireNonNull(reason, "reason");
     }
 
+    /** The first row for a user: no from-status. */
+    public static UserStatusHistory created(AppUser user, AppUser actor, String reason) {
+        UserStatusHistory row = new UserStatusHistory();
+        row.user = Objects.requireNonNull(user, "user");
+        row.toStatus = Objects.requireNonNull(user.getStatus(), "status");
+        row.actor = Objects.requireNonNull(actor, "actor");
+        row.reason = Objects.requireNonNull(reason, "reason");
+        return row;
+    }
+
     public UUID getId() {
         return id;
     }

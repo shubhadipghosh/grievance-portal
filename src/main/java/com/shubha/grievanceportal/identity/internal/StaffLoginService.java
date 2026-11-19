@@ -25,7 +25,8 @@ class StaffLoginService {
 
     sealed interface Result {
 
-        record Authenticated(UUID userId) implements Result {
+        /** @param mustChangePassword signed in with an admin-generated password */
+        record Authenticated(UUID userId, boolean mustChangePassword) implements Result {
         }
 
         /** Deliberately carries no reason. */
@@ -80,7 +81,7 @@ class StaffLoginService {
             if (matches && staff.isPresent() && staff.get().getStatus() == UserStatus.ACTIVE) {
                 // Only failures count: undo this attempt's increment.
                 status.setRollbackOnly();
-                return new Result.Authenticated(staff.get().getId());
+                return new Result.Authenticated(staff.get().getId(), staff.get().isMustChangePassword());
             }
             return FAILED;
         });

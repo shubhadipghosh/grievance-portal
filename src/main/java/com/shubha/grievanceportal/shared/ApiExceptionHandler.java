@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import java.net.URI;
+
 /**
  * The one place errors become HTTP responses, all as RFC 9457 ProblemDetail.
  * The base class already covers Spring MVC's own exceptions: validation
@@ -25,6 +27,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  */
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
+
+    public static final URI PASSWORD_CHANGE_REQUIRED = URI.create("urn:grievance:password-change-required");
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
@@ -48,13 +52,26 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, e);
     }
 
+    @ExceptionHandler({AlreadyExistsException.class, AlreadyRevokedException.class})
+    ProblemDetail alreadyDone(RuntimeException e) {
+        return problem(HttpStatus.CONFLICT, e);
+    }
+
+    // A type the client can match on, so it can send the user to the change-password screen.
+    @ExceptionHandler(PasswordChangeRequiredException.class)
+    ProblemDetail passwordChangeRequired(PasswordChangeRequiredException e) {
+        ProblemDetail problem = problem(HttpStatus.FORBIDDEN, e);
+        problem.setType(PASSWORD_CHANGE_REQUIRED);
+        return problem;
+    }
+
     @ExceptionHandler(ReopenLimitReachedException.class)
     ProblemDetail reopenLimitReached(ReopenLimitReachedException e) {
         return problem(HttpStatus.CONFLICT, e);
     }
 
     @ExceptionHandler({IneligibleAssigneeException.class, InvalidHoldDetailsException.class,
-            InvalidReferenceException.class})
+            InvalidReferenceException.class, PasswordRejectedException.class})
     ProblemDetail unprocessable(RuntimeException e) {
         return problem(HttpStatus.UNPROCESSABLE_CONTENT, e);
     }

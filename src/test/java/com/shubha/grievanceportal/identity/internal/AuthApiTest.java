@@ -218,6 +218,134 @@ class AuthApiTest {
                 .andExpect(jsonPath("$.id").value(admin.getId().toString()));
     }
 
+    // ---------------------------------------------------------------- password change
+
+    AppUser staffWithTemporaryPassword(String email) {
+        AppUser user = AppUser.staff("New Staff", email, encoder.encode(PASSWORD));
+        user.setTemporaryPassword(user.getPasswordHash());
+        return users.save(user);
+    }
+
+    ResultActions changePassword(Cookie session, String current, String next) throws Exception {
+        return mvc.perform(json(post("/api/v1/auth/password"),
+                "{\"currentPassword\": \"%s\", \"newPassword\": \"%s\"}".formatted(current, next))
+                .cookie(session).with(csrfToken()));
+    }
+
+    @Test
+    void ordinaryStaffLoginNeedsNoPasswordChange() throws Exception {
+        staff("auth-test-20@example.test");
+        Cookie session = sessionCookie(staffLogin("auth-test-20@example.test", PASSWORD)
+                .andExpect(jsonPath("$.mustChangePassword").value(false)));
+        mvc.perform(get("/api/v1/departments").cookie(session)).andExpect(status().isOk());
+    }
+
+    @Test
+    void temporaryPasswordAllowsNothingButChangingIt() throws Exception {
+        staffWithTemporaryPassword("auth-test-21@example.test");
+        Cookie session = sessionCookie(staffLogin("auth-test-21@example.test", PASSWORD)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mustChangePassword").value(true)));
+
+        mvc.perform(get("/api/v1/departments").cookie(session))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:grievance:password-change-required"));
+        me(session).andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(true));
+
+        changePassword(session, PASSWORD, "a much better passphrase").andExpect(status().isNoContent());
+
+        me(session).andExpect(jsonPath("$.mustChangePassword").value(false));
+        mvc.perform(get("/api/v1/departments").cookie(session)).andExpect(status().isOk());
+        assertThat(users.findByEmail("auth-test-21@example.test").orElseThrow().isMustChangePassword()).isFalse();
+
+        // And the next login starts clean.
+        staffLogin("auth-test-21@example.test", "a much better passphrase")
+                .andExpect(jsonPath("$.mustChangePassword").value(false));
+    }
+
+    @Test
+    void passwordChangeEndsTheUsersOtherSessions() throws Exception {
+        staff("auth-test-22@example.test");
+        Cookie phone = sessionCookie(staffLogin("auth-test-22@example.test", PASSWORD));
+        Cookie laptop = sessionCookie(staffLogin("auth-test-22@example.test", PASSWORD));
+
+        changePassword(laptop, PASSWORD, "a much better passphrase").andExpect(status().isNoContent());
+
+        me(laptop).andExpect(status().isOk());
+        me(phone).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void wrongCurrentPasswordIs422AndChangesNothing() throws Exception {
+        staff("auth-test-23@example.test");
+        Cookie session = sessionCookie(staffLogin("auth-test-23@example.test", PASSWORD));
+        changePassword(session, "not it at all", "a much better passphrase")
+                .andExpect(status().isUnprocessableContent());
+        staffLogin("auth-test-23@example.test", PASSWORD).andExpect(status().isOk());
+    }
+
+    @Test
+    void wrongCurrentPasswordsAreCapped() throws Exception {
+        staff("auth-test-25@example.test");
+        Cookie session = sessionCookie(staffLogin("auth-test-25@example.test", PASSWORD));
+        for (int i = 0; i < StaffLoginService.MAX_FAILURES; i++) {
+            changePassword(session, "guess " + i, "a much better passphrase")
+                    .andExpect(status().isUnprocessableContent());
+        }
+
+        // Blocked even with the right password, and for login too: one counter per account.
+        changePassword(session, PASSWORD, "a much better passphrase")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"));
+        staffLogin("auth-test-25@example.test", PASSWORD).andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void failedLoginsCountAgainstPasswordChange() throws Exception {
+        staff("auth-test-26@example.test");
+        Cookie session = sessionCookie(staffLogin("auth-test-26@example.test", PASSWORD));
+        for (int i = 0; i < StaffLoginService.MAX_FAILURES; i++) {
+            staffLogin("auth-test-26@example.test", "wrong").andExpect(status().isUnauthorized());
+        }
+        changePassword(session, PASSWORD, "a much better passphrase").andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void successfulPasswordChangeDoesNotCount() throws Exception {
+        staff("auth-test-27@example.test");
+        Cookie session = sessionCookie(staffLogin("auth-test-27@example.test", PASSWORD));
+        for (int i = 0; i < StaffLoginService.MAX_FAILURES - 1; i++) {
+            changePassword(session, "guess " + i, "a much better passphrase")
+                    .andExpect(status().isUnprocessableContent());
+        }
+        changePassword(session, PASSWORD, "a much better passphrase").andExpect(status().isNoContent());
+
+        // Had the success counted, this would be the attempt past the cap.
+        staffLogin("auth-test-27@example.test", "a much better passphrase").andExpect(status().isOk());
+    }
+
+    @Test
+    void newPasswordMustDifferAndBeLongEnough() throws Exception {
+        staff("auth-test-24@example.test");
+        Cookie session = sessionCookie(staffLogin("auth-test-24@example.test", PASSWORD));
+        changePassword(session, PASSWORD, PASSWORD).andExpect(status().isUnprocessableContent());
+        changePassword(session, PASSWORD, "short").andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void citizensHaveNoPasswordToChange() throws Exception {
+        Cookie session = citizenSession(phone(20));
+        changePassword(session, "anything", "a much better passphrase").andExpect(status().isForbidden());
+    }
+
+    @Test
+    void passwordChangeNeedsASession() throws Exception {
+        mvc.perform(json(post("/api/v1/auth/password"),
+                        "{\"currentPassword\": \"x\", \"newPassword\": \"a much better passphrase\"}")
+                        .with(csrfToken()))
+                .andExpect(status().isUnauthorized());
+    }
+
     @Test
     void everyStaffLoginFailureLooksTheSame() throws Exception {
         staff("auth-test-2@example.test");
