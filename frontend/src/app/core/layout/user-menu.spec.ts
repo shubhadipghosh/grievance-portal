@@ -73,6 +73,22 @@ describe('UserMenu', () => {
     expect(el.querySelector('#account-panel')!.textContent).toContain('+919876543210');
   });
 
+  it('offers a password change to staff only', async () => {
+    await signIn('STAFF', { fullName: 'Ravi Das', email: 'ravi@city.gov.in', phone: null });
+    toggle().click();
+    await settle();
+    expect(el.querySelector('a[href="/change-password"]')!.textContent!.trim()).toBe(
+      'Change password',
+    );
+  });
+
+  it('offers no password change to a citizen', async () => {
+    await signIn('CITIZEN', { fullName: 'Asha Das', email: null, phone: '+919800000001' });
+    toggle().click();
+    await settle();
+    expect(el.querySelector('a[href="/change-password"]')).toBeNull();
+  });
+
   it('closes on Escape and returns focus to the button', async () => {
     await signIn('STAFF', { fullName: 'Ravi', email: 'ravi@city.gov.in', phone: null });
     toggle().click();

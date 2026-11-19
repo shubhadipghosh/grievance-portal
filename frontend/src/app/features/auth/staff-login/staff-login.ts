@@ -27,8 +27,8 @@ export class StaffLogin {
     this.error.set(null);
     await submit(this.loginForm, async (f) => {
       try {
-        await this.auth.login(f().value());
-        await this.router.navigateByUrl('/queue');
+        const user = await this.auth.login(f().value());
+        await this.router.navigateByUrl(user.mustChangePassword ? '/change-password' : '/queue');
       } catch (e) {
         this.error.set(errorMessage(e));
       }

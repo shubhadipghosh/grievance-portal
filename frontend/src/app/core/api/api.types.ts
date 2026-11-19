@@ -7,12 +7,24 @@ export type UserType = 'CITIZEN' | 'STAFF' | 'SYSTEM';
 export interface CurrentUser {
   id: string;
   type: UserType;
+  /**
+   * Staff signed in with an admin-generated password: every endpoint but
+   * /auth/me, /auth/password and logout refuses them until they choose their
+   * own. Sent by /auth/me and staff login; absent from the OTP login.
+   */
+  mustChangePassword?: boolean;
 }
 
 /** AuthController.StaffLoginRequest */
 export interface StaffLoginRequest {
   email: string;
   password: string;
+}
+
+/** AuthController.PasswordChangeRequest. newPassword: 12 to 72 characters. */
+export interface PasswordChangeRequest {
+  currentPassword: string;
+  newPassword: string;
 }
 
 /** AuthController.OtpSendRequest. phone is E.164: +91 then 10 digits. */

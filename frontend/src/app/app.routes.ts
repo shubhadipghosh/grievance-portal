@@ -1,5 +1,10 @@
 import { Routes } from '@angular/router';
-import { authGuard, citizenGuard, staffGuard } from './core/auth/auth.guard';
+import {
+  authGuard,
+  citizenGuard,
+  passwordChangeGuard,
+  staffGuard,
+} from './core/auth/auth.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'queue' },
@@ -35,6 +40,12 @@ export const routes: Routes = [
     path: 'queue',
     canActivate: [staffGuard],
     loadComponent: () => import('./features/queue/queue').then((m) => m.Queue),
+  },
+  {
+    path: 'change-password',
+    canActivate: [passwordChangeGuard],
+    loadComponent: () =>
+      import('./features/auth/change-password/change-password').then((m) => m.ChangePassword),
   },
   {
     path: 'profile',

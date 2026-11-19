@@ -64,6 +64,16 @@ describe('StaffLogin', () => {
     expect(navigate).toHaveBeenCalledWith('/queue');
   });
 
+  it('sends a user with a generated password to choose their own', async () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    await submitValid();
+    backend
+      .expectOne('/api/v1/auth/staff/login')
+      .flush({ id: 'u1', type: 'STAFF', mustChangePassword: true });
+    await settle();
+    expect(navigate).toHaveBeenCalledWith('/change-password');
+  });
+
   it.each([
     [401, {}, 'Incorrect email or password.'],
     [429, { 'Retry-After': '45' }, 'Too many attempts. Try again in 45 seconds.'],

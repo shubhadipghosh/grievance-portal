@@ -5,6 +5,7 @@ import {
   CurrentUser,
   OtpSendRequest,
   OtpVerifyRequest,
+  PasswordChangeRequest,
   StaffLoginRequest,
 } from '../api/api.types';
 
@@ -52,6 +53,15 @@ export class AuthService {
     );
     this.user.set(user);
     return user;
+  }
+
+  /**
+   * Staff only. Rejects with 422 for a wrong current password or an unchanged
+   * one, 429 after too many wrong ones. Ends the user's other sessions.
+   */
+  async changePassword(request: PasswordChangeRequest): Promise<void> {
+    await firstValueFrom(this.http.post<void>('/api/v1/auth/password', request));
+    this.user.update((user) => user && { ...user, mustChangePassword: false });
   }
 
   async logout(): Promise<void> {

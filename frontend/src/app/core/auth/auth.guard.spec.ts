@@ -2,7 +2,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { CanActivateFn, provideRouter, Router, UrlTree } from '@angular/router';
-import { authGuard, citizenGuard, staffGuard } from './auth.guard';
+import { authGuard, citizenGuard, passwordChangeGuard, staffGuard } from './auth.guard';
 
 describe('auth guards', () => {
   let backend: HttpTestingController;
@@ -31,6 +31,32 @@ describe('auth guards', () => {
 
   const staff = { id: 'u1', type: 'STAFF' };
   const citizen = { id: 'u2', type: 'CITIZEN' };
+
+  const mustChange = { id: 'u3', type: 'STAFF', mustChangePassword: true };
+
+  it('staffGuard: holds a user who must change their password', async () => {
+    expect(await run(staffGuard, mustChange)).toBe('/change-password');
+  });
+
+  it('authGuard: holds a user who must change their password', async () => {
+    expect(await run(authGuard, mustChange)).toBe('/change-password');
+  });
+
+  it('passwordChangeGuard: lets a user who must change their password through', async () => {
+    expect(await run(passwordChangeGuard, mustChange)).toBe(true);
+  });
+
+  it('passwordChangeGuard: allows staff', async () => {
+    expect(await run(passwordChangeGuard, staff)).toBe(true);
+  });
+
+  it('passwordChangeGuard: redirects a citizen session', async () => {
+    expect(await run(passwordChangeGuard, citizen)).toBe('/login');
+  });
+
+  it('passwordChangeGuard: redirects without a session', async () => {
+    expect(await run(passwordChangeGuard, null)).toBe('/login');
+  });
 
   it('authGuard: redirects without a session', async () => {
     expect(await run(authGuard, null)).toBe('/login');

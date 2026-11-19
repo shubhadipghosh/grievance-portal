@@ -27,6 +27,9 @@
       </div>
 
       <a routerLink="/profile" class="item" (click)="close()">My profile</a>
+      @if (user()?.type === 'STAFF') {
+        <a routerLink="/change-password" class="item" (click)="close()">Change password</a>
+      }
 
       @if (error(); as message) {
         <p class="error" role="alert">{{ message }}</p>
