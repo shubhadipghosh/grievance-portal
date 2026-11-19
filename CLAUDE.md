@@ -95,6 +95,14 @@ append-only, enforced by a database trigger. Never bypass it.
   officers cannot pause the SLA clock.
 - RESOLVED → CLOSED: citizen confirms, or auto-closes after 7 days of no
   response. Citizen may reopen within that window.
+- Every staff member belongs to exactly one department (enforced by
+  `trg_grant_scope`, V12). Work never crosses departments by assignment.
+- Cross-department handover = reroute the grievance (step 5, uses the
+  existing `grievance_reroute` table). The dept admin reroutes directly to
+  the other department with a mandatory reason; no super-admin queue.
+  The receiving department's admin then assigns.
+- A rerouted grievance keeps its original SLA deadline. The clock is the
+  citizen's, not the department's.
 
 ## Build order
 
