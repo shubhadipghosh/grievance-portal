@@ -1,6 +1,7 @@
 package com.shubha.grievanceportal.grievance.internal;
 
 import com.shubha.grievanceportal.grievance.GrievanceDetails;
+import com.shubha.grievanceportal.grievance.GrievanceStatus;
 
 import java.util.List;
 
@@ -14,6 +15,7 @@ import java.util.List;
  * @param departmentAdmins   DEPT_ADMINs whose scope covers the grievance; may be empty
  * @param canComment         may post a comment everyone sees
  * @param canCommentInternal may post an internal remark (staff with GRIEVANCE_COMMENT)
+ * @param actions            the status changes the viewer may make now, in transition-table order
  */
 record TicketOverview(
         GrievanceDetails grievance,
@@ -24,5 +26,10 @@ record TicketOverview(
         String assigneeName,
         List<String> departmentAdmins,
         boolean canComment,
-        boolean canCommentInternal) {
+        boolean canCommentInternal,
+        List<Action> actions) {
+
+    /** One transition the viewer may make from the current status. */
+    record Action(GrievanceStatus to, boolean reasonRequired) {
+    }
 }

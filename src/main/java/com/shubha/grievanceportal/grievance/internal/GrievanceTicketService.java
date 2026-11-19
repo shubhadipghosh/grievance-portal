@@ -1,8 +1,10 @@
 package com.shubha.grievanceportal.grievance.internal;
 
 import com.shubha.grievanceportal.grievance.GrievanceService;
+import com.shubha.grievanceportal.grievance.GrievanceStatus;
 import com.shubha.grievanceportal.identity.AppUser;
 import com.shubha.grievanceportal.identity.StaffDirectory;
+import com.shubha.grievanceportal.identity.StaffMember;
 import com.shubha.grievanceportal.organization.CategoryNames;
 import com.shubha.grievanceportal.shared.NotAuthorizedException;
 import com.shubha.grievanceportal.shared.NotFoundException;
@@ -27,6 +29,8 @@ import static com.shubha.grievanceportal.grievance.internal.GrievanceTransitions
 class GrievanceTicketService {
 
     static final String COMMENT = "GRIEVANCE_COMMENT";
+    static final String ASSIGN = "GRIEVANCE_ASSIGN";
+    static final String WORK = "GRIEVANCE_WORK";
 
     private final GrievanceRepository grievances;
     private final GrievanceService grievanceService;
@@ -67,7 +71,34 @@ class GrievanceTicketService {
                 assignee == null ? null : assignee.getFullName(),
                 staffDirectory.namesWithRoleInScope("DEPT_ADMIN", departmentId, wardId),
                 authorization.isAuthorized(viewerId, g, Set.of(CITIZEN_OWNER, COMMENT)),
-                authorization.isAuthorized(viewerId, g, Set.of(COMMENT)));
+                authorization.isAuthorized(viewerId, g, Set.of(COMMENT)),
+                actions(g, viewerId));
+    }
+
+    /**
+     * The transitions out of the current status that the viewer may make, by the
+     * same permission and reopen-limit rules the transition service enforces.
+     */
+    private List<TicketOverview.Action> actions(Grievance g, UUID viewerId) {
+        return GrievanceTransitions.from(g.getStatus()).stream()
+                .filter(t -> !(t.to() == GrievanceStatus.REOPENED && g.getReopenCount() > 0))
+                .filter(t -> authorization.isAuthorized(viewerId, g, t.permissions()))
+                .map(t -> new TicketOverview.Action(t.to(), t.reasonRequired()))
+                .toList();
+    }
+
+    /**
+     * Who the grievance can be assigned to: ACTIVE staff with GRIEVANCE_WORK in
+     * its scope, the same rule the assign transition checks.
+     *
+     * @throws NotAuthorizedException the viewer may not assign this grievance
+     */
+    List<StaffMember> assignees(UUID grievanceId, UUID viewerId) {
+        Grievance g = load(grievanceId);
+        if (!authorization.isAuthorized(viewerId, g, Set.of(ASSIGN))) {
+            throw new NotAuthorizedException("You may not assign this grievance");
+        }
+        return staffDirectory.staffWithPermissionInScope(WORK, g.getDepartment().getId(), g.getWard().getId());
     }
 
     /**

@@ -70,4 +70,9 @@ final class GrievanceTransitions {
                 .filter(t -> t.from() == from && t.to() == to)
                 .findFirst();
     }
+
+    /** Every transition out of the status, in table order. */
+    static List<Transition> from(GrievanceStatus from) {
+        return TRANSITIONS.stream().filter(t -> t.from() == from).toList();
+    }
 }

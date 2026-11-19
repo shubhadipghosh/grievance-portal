@@ -80,4 +80,28 @@ public interface UserRoleGrantRepository extends JpaRepository<UserRoleGrant, UU
     List<String> findNamesWithRoleInScope(@Param("roleCode") String roleCode,
                                           @Param("departmentId") UUID departmentId,
                                           @Param("wardId") UUID wardId);
+
+    interface StaffRow {
+        UUID getId();
+
+        String getFullName();
+    }
+
+    // Same conditions as hasPermissionInScope, for every staff user at once.
+    @Query(value = """
+            select distinct u.id as id, u.full_name as fullName
+            from user_role_grant g
+            join role_permission rp on rp.role_id = g.role_id
+            join app_user u on u.id = g.user_id
+            where rp.permission_code = :code
+              and u.user_type = 'STAFF'
+              and u.status = 'ACTIVE'
+              and g.revoked_at is null
+              and (g.department_id is null or g.department_id = :departmentId)
+              and (g.ward_id is null or g.ward_id = :wardId)
+            order by u.full_name
+            """, nativeQuery = true)
+    List<StaffRow> findStaffWithPermissionInScope(@Param("code") String code,
+                                                  @Param("departmentId") UUID departmentId,
+                                                  @Param("wardId") UUID wardId);
 }

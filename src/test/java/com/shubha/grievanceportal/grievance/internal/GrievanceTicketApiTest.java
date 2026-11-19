@@ -163,6 +163,67 @@ class GrievanceTicketApiTest {
         return JsonPath.read(activity, "$[?(@.kind == '" + kind + "')]");
     }
 
+    // ---------------------------------------------------------------- actions
+
+    static List<String> actionTargets(String overview) {
+        return JsonPath.read(overview, "$.actions[*].to");
+    }
+
+    @Test
+    void actionsFollowTheViewersPermissions() throws Exception {
+        String id = file();
+        assertThat(actionTargets(read("overview", id, admin))).containsExactly("ACKNOWLEDGED", "REJECTED");
+        assertThat(actionTargets(read("overview", id, officer))).isEmpty();
+        assertThat(actionTargets(read("overview", id, citizen))).isEmpty();
+
+        transitions.transition(UUID.fromString(id), GrievanceStatus.ACKNOWLEDGED, admin.getId(), null);
+        transitions.assign(UUID.fromString(id), officer.getId(), admin.getId(), null);
+        assertThat(actionTargets(read("overview", id, officer))).containsExactly("IN_PROGRESS");
+        assertThat(actionTargets(read("overview", id, admin))).containsExactly("IN_PROGRESS", "REJECTED");
+    }
+
+    @Test
+    void actionsCarryWhetherAReasonIsRequired() throws Exception {
+        String body = read("overview", file(), admin);
+        assertThat(JsonPath.<List<Boolean>>read(body, "$.actions[?(@.to == 'ACKNOWLEDGED')].reasonRequired"))
+                .containsExactly(false);
+        assertThat(JsonPath.<List<Boolean>>read(body, "$.actions[?(@.to == 'REJECTED')].reasonRequired"))
+                .containsExactly(true);
+    }
+
+    @Test
+    void citizenMayCloseOrReopenOnceAfterResolution() throws Exception {
+        UUID id = UUID.fromString(assigned());
+        transitions.transition(id, GrievanceStatus.IN_PROGRESS, officer.getId(), null);
+        transitions.transition(id, GrievanceStatus.RESOLVED, officer.getId(), "cleared");
+        assertThat(actionTargets(read("overview", id.toString(), citizen))).containsExactly("CLOSED", "REOPENED");
+
+        transitions.transition(id, GrievanceStatus.REOPENED, citizen.getId(), "still full");
+        transitions.assign(id, officer.getId(), admin.getId(), null);
+        transitions.transition(id, GrievanceStatus.IN_PROGRESS, officer.getId(), null);
+        transitions.transition(id, GrievanceStatus.RESOLVED, officer.getId(), "cleared again");
+        assertThat(actionTargets(read("overview", id.toString(), citizen))).containsExactly("CLOSED");
+    }
+
+    // ---------------------------------------------------------------- assignees
+
+    @Test
+    void assigneesAreActiveStaffWhoMayWorkIt() throws Exception {
+        String id = file();
+        // DEPT_ADMIN also holds GRIEVANCE_WORK; the water admin's scope does not cover it.
+        assertThat(JsonPath.<List<String>>read(read("assignees", id, admin), "$[*].fullName"))
+                .containsExactly("Mita Paul", "Ravi Sen", "Sanitation Admin");
+    }
+
+    @Test
+    void onlyThoseWhoMayAssignSeeAssignees() throws Exception {
+        String id = file();
+        for (AppUser viewer : List.of(officer, citizen)) {
+            mvc.perform(get("/api/v1/grievances/{id}/assignees", id).with(as(viewer)))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
     // ---------------------------------------------------------------- overview
 
     @Test

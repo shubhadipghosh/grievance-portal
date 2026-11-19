@@ -1,6 +1,7 @@
 package com.shubha.grievanceportal.identity.internal;
 
 import com.shubha.grievanceportal.identity.StaffDirectory;
+import com.shubha.grievanceportal.identity.StaffMember;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,5 +25,15 @@ class StaffDirectoryImpl implements StaffDirectory {
         Objects.requireNonNull(departmentId, "departmentId");
         Objects.requireNonNull(wardId, "wardId");
         return grants.findNamesWithRoleInScope(roleCode, departmentId, wardId);
+    }
+
+    @Override
+    public List<StaffMember> staffWithPermissionInScope(String permissionCode, UUID departmentId, UUID wardId) {
+        Objects.requireNonNull(permissionCode, "permissionCode");
+        Objects.requireNonNull(departmentId, "departmentId");
+        Objects.requireNonNull(wardId, "wardId");
+        return grants.findStaffWithPermissionInScope(permissionCode, departmentId, wardId).stream()
+                .map(row -> new StaffMember(row.getId(), row.getFullName()))
+                .toList();
     }
 }

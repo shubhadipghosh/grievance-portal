@@ -22,6 +22,16 @@
       <h1>{{ o.grievance.title }}</h1>
     </header>
 
+    @if (o.actions.length > 0) {
+      <app-ticket-actions
+        [grievanceId]="o.grievance.id"
+        [status]="o.grievance.status"
+        [actions]="o.actions"
+        [isCitizen]="isCitizen()"
+        (changed)="load()"
+      />
+    }
+
     <div class="layout">
       <div class="primary">
         <section class="card" aria-labelledby="description-heading">

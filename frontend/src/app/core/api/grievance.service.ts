@@ -7,11 +7,22 @@ import {
   GrievanceDetails,
   GrievanceStatus,
   GrievanceSummary,
+  HoldRequest,
   NewComment,
   NewGrievance,
   PagedModel,
+  StaffMember,
   TicketOverview,
 } from './api.types';
+
+/** The status-change endpoints that take only an optional reason. */
+export type TransitionPath =
+  | 'acknowledge'
+  | 'in-progress'
+  | 'resolve'
+  | 'reject'
+  | 'close'
+  | 'reopen';
 
 @Service()
 export class GrievanceService {
@@ -70,5 +81,29 @@ export class GrievanceService {
         params: { departmentId, status, page },
       }),
     );
+  }
+
+  /** POST /grievances/{id}/{path}: a status change that needs no more than a reason. */
+  transition(id: string, path: TransitionPath, reason: string | null): Promise<GrievanceDetails> {
+    return firstValueFrom(
+      this.http.post<GrievanceDetails>(`/api/v1/grievances/${id}/${path}`, { reason }),
+    );
+  }
+
+  /** 422 when the assignee cannot take the work. reason: max 500. */
+  assign(id: string, assigneeId: string, reason: string | null): Promise<GrievanceDetails> {
+    return firstValueFrom(
+      this.http.post<GrievanceDetails>(`/api/v1/grievances/${id}/assign`, { assigneeId, reason }),
+    );
+  }
+
+  /** 422 when the owner details do not fit the reason type. */
+  hold(id: string, hold: HoldRequest): Promise<GrievanceDetails> {
+    return firstValueFrom(this.http.post<GrievanceDetails>(`/api/v1/grievances/${id}/hold`, hold));
+  }
+
+  /** Staff the grievance can be assigned to. 403 unless the caller may assign it. */
+  assignees(id: string): Promise<StaffMember[]> {
+    return firstValueFrom(this.http.get<StaffMember[]>(`/api/v1/grievances/${id}/assignees`));
   }
 }

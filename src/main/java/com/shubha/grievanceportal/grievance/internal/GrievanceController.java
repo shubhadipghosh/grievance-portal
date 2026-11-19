@@ -10,6 +10,7 @@ import com.shubha.grievanceportal.grievance.HoldOwnerType;
 import com.shubha.grievanceportal.grievance.HoldReasonType;
 import com.shubha.grievanceportal.grievance.NewGrievance;
 import com.shubha.grievanceportal.identity.CurrentUser;
+import com.shubha.grievanceportal.identity.StaffMember;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -135,6 +136,13 @@ class GrievanceController {
                                 String acceptLanguage) {
         viewGate.requireVisible(actor.id(), id);
         return tickets.activity(id, actor.id(), acceptLanguage);
+    }
+
+    /** Staff the grievance can be assigned to. 403 unless the caller may assign it. */
+    @GetMapping("/{id}/assignees")
+    List<StaffMember> assignees(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id) {
+        viewGate.requireVisible(actor.id(), id);
+        return tickets.assignees(id, actor.id());
     }
 
     @PostMapping("/{id}/comments")

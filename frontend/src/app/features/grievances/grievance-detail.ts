@@ -13,6 +13,7 @@ import {
   STATUS_LABELS,
 } from '../../core/api/labels';
 import { AuthService } from '../../core/auth/auth.service';
+import { TicketActions } from './ticket-actions';
 
 /** Which part of the activity feed is showing. */
 type ActivityFilter = 'ALL' | 'COMMENTS' | 'HISTORY';
@@ -26,7 +27,7 @@ const MAX_COMMENT = 2000;
  */
 @Component({
   selector: 'app-grievance-detail',
-  imports: [DatePipe, FormField, RouterLink],
+  imports: [DatePipe, FormField, RouterLink, TicketActions],
   templateUrl: './grievance-detail.html',
   styleUrl: './grievance-detail.scss',
 })

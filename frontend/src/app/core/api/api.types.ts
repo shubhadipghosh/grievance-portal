@@ -135,6 +135,29 @@ export interface TicketOverview {
   canComment: boolean;
   /** May post an internal remark: staff only. */
   canCommentInternal: boolean;
+  /** The status changes the viewer may make now. Empty when there are none. */
+  actions: TicketAction[];
+}
+
+/** grievance.internal.TicketOverview.Action: one transition out of the current status. */
+export interface TicketAction {
+  to: GrievanceStatus;
+  reasonRequired: boolean;
+}
+
+/** identity.StaffMember: someone a grievance can be assigned to. */
+export interface StaffMember {
+  id: string;
+  fullName: string;
+}
+
+/** GrievanceController.HoldRequest. holdOwnerNote: max 255; reason: max 1000. */
+export interface HoldRequest {
+  reasonType: HoldReasonType;
+  ownerType: HoldOwnerType;
+  holdOwnerId: string | null;
+  holdOwnerNote: string | null;
+  reason: string | null;
 }
 
 /** grievance.internal.ActivityItem.Kind */

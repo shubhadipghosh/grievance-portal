@@ -43,6 +43,7 @@ function overview(
     departmentAdmins: ['Sanitation Admin'],
     canComment: true,
     canCommentInternal: false,
+    actions: [],
     ...overrides,
   };
 }
@@ -181,6 +182,26 @@ describe('GrievanceDetail', () => {
       expect(text('.description')).toBe('Bins overflowing for three days.');
       expect(text('.location')).toBe('Location Near the market gate');
       expect(text('a.back')).toBe('← Queue');
+    });
+
+    it('shows actions only when there are some, and reloads after one', async () => {
+      await respond(overview());
+      expect(el.querySelector('app-ticket-actions')).toBeNull();
+
+      fixture.componentInstance['load']();
+      await respond(overview({ actions: [{ to: 'IN_PROGRESS', reasonRequired: false }] }));
+      expect(text('app-ticket-actions .buttons')).toBe('Start work');
+
+      button('Start work').click();
+      await settle();
+      el.querySelector<HTMLButtonElement>('app-ticket-actions form button[type="submit"]')!.click();
+      await settle();
+      backend.expectOne('/api/v1/grievances/g1/in-progress').flush({});
+      await settle();
+
+      await respond(overview({ actions: [] }, { status: 'IN_PROGRESS' }));
+      expect(text('.ticket-meta')).toBe('GRV-2026-000042 In progress');
+      expect(el.querySelector('app-ticket-actions')).toBeNull();
     });
 
     it('fills the details panel', async () => {

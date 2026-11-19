@@ -1,0 +1,96 @@
+<section class="card ticket-actions" aria-labelledby="actions-heading">
+  <h2 id="actions-heading">Actions</h2>
+
+  <div class="buttons">
+    @for (action of actions(); track action.to) {
+      <button
+        type="button"
+        [class.secondary]="open()?.to !== action.to"
+        [class.danger]="isDanger(action)"
+        [attr.aria-expanded]="open()?.to === action.to"
+        aria-controls="action-form"
+        (click)="start(action)"
+      >
+        {{ label(action) }}
+      </button>
+    }
+  </div>
+
+  @if (open(); as action) {
+    <form id="action-form" (submit)="submit($event)">
+      @if (action.to === 'ASSIGNED') {
+        <div class="field">
+          <label for="action-assignee">Assign to</label>
+          @if (assignees(); as staff) {
+            <select id="action-assignee" [formField]="actionForm.assigneeId">
+              <option value="" disabled>Choose a person</option>
+              @for (member of staff; track member.id) {
+                <option [value]="member.id">{{ member.fullName }}</option>
+              }
+            </select>
+            @if (staff.length === 0) {
+              <p class="hint">No one can take this grievance in its ward.</p>
+            }
+          } @else if (!error()) {
+            <p role="status">Loading…</p>
+          }
+        </div>
+      }
+
+      @if (action.to === 'ON_HOLD') {
+        <div class="field">
+          <label for="action-hold-reason">Waiting on</label>
+          <select id="action-hold-reason" [formField]="actionForm.holdReason">
+            <option value="" disabled>Choose a reason</option>
+            @for (r of holdReasons; track r.value) {
+              <option [value]="r.value">{{ r.label }}</option>
+            }
+          </select>
+        </div>
+        @if (needsOwnerNote()) {
+          <div class="field">
+            <label for="action-hold-owner">Who exactly</label>
+            <input
+              id="action-hold-owner"
+              type="text"
+              placeholder="e.g. Ganguly Contractors"
+              [formField]="actionForm.holdOwnerNote"
+            />
+          </div>
+        }
+      }
+
+      <div class="field">
+        <label for="action-reason">{{ reasonLabel(action) }}</label>
+        <textarea
+          id="action-reason"
+          rows="3"
+          [formField]="actionForm.reason"
+          [attr.aria-required]="action.reasonRequired"
+          aria-describedby="action-reason-hint"
+        ></textarea>
+        <p id="action-reason-hint" class="hint">
+          @if (!isCitizen() && action.to !== 'REOPENED') {
+            The citizen sees the status change, not this note.
+          }
+          <span [class.over]="reason().length > maxReason()"
+            >{{ reason().length }}/{{ maxReason() }}</span
+          >
+        </p>
+      </div>
+
+      @if (error(); as message) {
+        <p class="form-error" role="alert">{{ message }}</p>
+      }
+
+      <div class="form-buttons">
+        <button type="button" class="secondary" (click)="cancel()">Cancel</button>
+        <button type="submit" [class.danger]="isDanger(action)" [disabled]="!canSubmit()">
+          {{ saving() ? 'Saving…' : label(action) }}
+        </button>
+      </div>
+    </form>
+  } @else if (error(); as message) {
+    <p class="form-error" role="alert">{{ message }}</p>
+  }
+</section>
