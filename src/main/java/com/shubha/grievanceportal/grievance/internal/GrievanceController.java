@@ -178,6 +178,36 @@ class GrievanceController {
         return grievances.get(id);
     }
 
+    /**
+     * Transitions 5 (start work, from ASSIGNED), 10 (release hold, from ON_HOLD) and
+     * 14 (revert a resolution, from RESOLVED): the table decides which applies.
+     */
+    @PostMapping("/{id}/in-progress")
+    GrievanceDetails inProgress(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,
+                                @Valid @RequestBody(required = false) ReasonRequest body) {
+        viewGate.requireVisible(actor.id(), id);
+        transitions.transition(id, GrievanceStatus.IN_PROGRESS, actor.id(), reason(body));
+        return grievances.get(id);
+    }
+
+    /** Transitions 2, 4, 6, 9, 11 and 18. Always needs a reason. */
+    @PostMapping("/{id}/reject")
+    GrievanceDetails reject(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,
+                            @Valid @RequestBody(required = false) ReasonRequest body) {
+        viewGate.requireVisible(actor.id(), id);
+        transitions.transition(id, GrievanceStatus.REJECTED, actor.id(), reason(body));
+        return grievances.get(id);
+    }
+
+    /** Transitions 13 (from RESOLVED) and 16 (from REJECTED): the owning citizen, once. */
+    @PostMapping("/{id}/reopen")
+    GrievanceDetails reopen(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,
+                            @Valid @RequestBody(required = false) ReasonRequest body) {
+        viewGate.requireVisible(actor.id(), id);
+        transitions.transition(id, GrievanceStatus.REOPENED, actor.id(), reason(body));
+        return grievances.get(id);
+    }
+
     /** Transitions 12 (from RESOLVED) and 15 (from REJECTED): the table decides which applies. */
     @PostMapping("/{id}/close")
     GrievanceDetails close(@AuthenticationPrincipal CurrentUser actor, @PathVariable UUID id,

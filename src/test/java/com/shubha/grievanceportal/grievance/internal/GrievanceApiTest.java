@@ -100,7 +100,7 @@ class GrievanceApiTest {
                 .executeUpdate();
     }
 
-    // No endpoint for transition 5 yet.
+    // Shortcut past acknowledge and assign; startWork() covers the real path.
     void forceInProgress(String grievanceId) {
         em.createNativeQuery("update grievance set status = 'IN_PROGRESS', current_assignee_id = ?1 where id = ?2")
                 .setParameter(1, officer.getId())
@@ -303,7 +303,107 @@ class GrievanceApiTest {
                 .andExpect(jsonPath("$.closedAt").exists());
     }
 
+    @Test
+    void startWork() throws Exception {
+        String id = file();
+        act("acknowledge", id, admin, null);
+        act("assign", id, admin, "{\"assigneeId\": \"%s\"}".formatted(officer.getId()));
+
+        act("in-progress", id, officer, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    }
+
+    @Test
+    void releaseHold() throws Exception {
+        String id = file();
+        forceInProgress(id);
+        act("hold", id, admin, """
+                {"reasonType": "AWAITING_CONTRACTOR", "ownerType": "EXTERNAL",
+                 "holdOwnerNote": "Ganguly Contractors", "reason": "waiting on parts"}""");
+
+        act("in-progress", id, admin, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    }
+
+    @Test
+    void revertResolution() throws Exception {
+        String id = file();
+        forceInProgress(id);
+        act("resolve", id, officer, "{\"reason\": \"bins cleared\"}");
+
+        act("in-progress", id, admin, "{\"reason\": \"bins still full\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    }
+
+    @Test
+    void reject() throws Exception {
+        act("reject", file(), admin, "{\"reason\": \"duplicate\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REJECTED"));
+    }
+
+    @Test
+    void citizenReopensOnceOnly() throws Exception {
+        String id = file();
+        forceInProgress(id);
+        act("resolve", id, officer, "{\"reason\": \"bins cleared\"}");
+
+        act("reopen", id, citizen, "{\"reason\": \"bins still full\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REOPENED"));
+
+        act("assign", id, admin, "{\"assigneeId\": \"%s\"}".formatted(officer.getId()));
+        act("in-progress", id, officer, null);
+        act("resolve", id, officer, "{\"reason\": \"cleared again\"}");
+        expectProblem(act("reopen", id, citizen, "{\"reason\": \"still full\"}"), 409);
+    }
+
     // ---------------------------------------------------------------- errors, end to end
+
+    @Test
+    void fieldOfficerCannotRevertResolution() throws Exception {
+        String id = file();
+        forceInProgress(id);
+        act("resolve", id, officer, "{\"reason\": \"bins cleared\"}");
+        expectProblem(act("in-progress", id, officer, "{\"reason\": \"oops\"}"), 403);
+    }
+
+    @Test
+    void revertWithoutReasonIs400() throws Exception {
+        String id = file();
+        forceInProgress(id);
+        act("resolve", id, officer, "{\"reason\": \"bins cleared\"}");
+        expectProblem(act("in-progress", id, admin, null), 400);
+    }
+
+    @Test
+    void fieldOfficerCannotReject() throws Exception {
+        expectProblem(act("reject", file(), officer, "{\"reason\": \"duplicate\"}"), 403);
+    }
+
+    @Test
+    void rejectWithoutReasonIs400() throws Exception {
+        expectProblem(act("reject", file(), admin, null), 400);
+    }
+
+    @Test
+    void staffCannotReopenOnCitizensBehalf() throws Exception {
+        String id = file();
+        forceInProgress(id);
+        act("resolve", id, officer, "{\"reason\": \"bins cleared\"}");
+        expectProblem(act("reopen", id, admin, "{\"reason\": \"citizen called\"}"), 403);
+    }
+
+    @Test
+    void reopenWithoutReasonIs400() throws Exception {
+        String id = file();
+        forceInProgress(id);
+        act("resolve", id, officer, "{\"reason\": \"bins cleared\"}");
+        expectProblem(act("reopen", id, citizen, null), 400);
+    }
 
     @Test
     void unknownTicketIs404() throws Exception {
